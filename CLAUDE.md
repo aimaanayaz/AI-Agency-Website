@@ -4,7 +4,6 @@ Marketing site for Z Agency (AI-native product studio). Routes:
 - `/` — landing page (hero, services showcase, about, trust bar, contact CTA)
 - `/chat` — Z assistant chat UI, backed by `/api/z-chat`
 - `/contact` — Formspree contact form
-- `/sidewalkdemo` — static QR-ordering demo (catch-all route)
 
 # Stack
 - Next.js 14 (App Router) + TypeScript + Tailwind
