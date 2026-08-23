@@ -1,11 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { motion, useMotionValue, useSpring } from "framer-motion";
 
 export function CustomCursor() {
-  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
@@ -59,9 +57,7 @@ export function CustomCursor() {
     };
   }, [cursorX, cursorY]);
 
-  // The /fashion shop uses the native cursor — the custom ring reads as a
-  // 3D-editor affordance, not an e-commerce site.
-  if (!isMounted || isTouchDevice || pathname?.startsWith("/fashion")) return null;
+  if (!isMounted || isTouchDevice) return null;
 
   return (
     <>

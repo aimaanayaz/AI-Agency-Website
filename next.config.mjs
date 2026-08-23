@@ -17,9 +17,6 @@ const nextConfig = {
   },
   experimental: {
     optimizePackageImports: ['framer-motion'],
-    // sharp ships a native binary — keep it external so webpack doesn't bundle
-    // it (which would break the native module at runtime).
-    serverComponentsExternalPackages: ['sharp'],
   },
   // Disable webpack's filesystem cache in dev. The project lives on OneDrive,
   // whose sync activity intermittently locks/relocates files in `.next/cache`,

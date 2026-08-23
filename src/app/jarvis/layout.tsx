@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./jarvis.css";
 
-// JARVIS is private. Keep it out of search engines and link previews.
+// A private-looking screen, kept out of search engines and link previews.
 export const metadata: Metadata = {
   title: "JARVIS",
   robots: { index: false, follow: false, nocache: true },

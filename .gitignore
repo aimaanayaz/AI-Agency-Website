@@ -42,6 +42,5 @@ next-env.d.ts
 build.log
 build_utf8.log
 
-# local verification artifacts (screenshot-harness output + dev server log)
-/shots/
+# local dev server log
 dev-server.log
