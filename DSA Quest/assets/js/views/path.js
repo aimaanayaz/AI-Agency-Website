@@ -9,7 +9,7 @@
     const req = E.isRequired(entry, unit);
     let meta;
     if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; const n = E.videoParts(E.idOf(ref)); meta = `Lecture, ${Math.round(v.dur / 60)} min${n > 1 && !done && it.parts ? `, ${it.parts} of ${n} parts watched` : ''}`; }
-    else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${{ E: 'Easy', M: 'Medium', H: 'Hard' }[p.d]}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
+    else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${E.showDiff(ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] : 'Problem'}${E.isBlind75(p) ? ', Blind 75' : ''}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
     const o = it.outcome && E.outcomeMeta(it.outcome);
     return `<li><button class="prow ${done ? 'is-done' : ''} ${req ? '' : 'is-optional'}" data-act="open" data-ref="${ref}">
       ${ui.dot(it.outcome, done)}

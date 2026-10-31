@@ -79,7 +79,17 @@
     return '';
   }
 
-  function helpBlock(ref, p) {
+  // A unit challenge is a small mock interview: hints stay closed for the first 25 minutes on the timer.
+  const lockLeft = ref => Math.max(0, Math.ceil(E.CHALLENGE_LOCK_MIN - E.timerSeconds(ref) / 60));
+  const lockText = ref => (S.state.timer && S.state.timer.ref === ref ? `Hints open in ${lockLeft(ref)} min` : `Hints open ${E.CHALLENGE_LOCK_MIN} minutes after you start`);
+  function hintLock(ref) {
+    return `<div class="hint-lock">${U.icon('lock-simple', 16)}<span data-unlock-ref="${ref}">${lockText(ref)}</span>
+      <button class="link" data-act="unlock-hints" data-ref="${ref}">Show them anyway</button></div>`;
+  }
+
+  function helpBlock(ref, p, mode) {
+    const it = S.peek(ref) || {};
+    if (p.src === 'boss' && mode === 'solve' && !it.hintUnlocked && lockLeft(ref) > 0) return hintLock(ref);
     const lec = E.idx.lectureFor[E.idOf(ref)], lecV = lec && E.video(lec);
     const pats = p.pt.map(k => D.patterns[k]).filter(Boolean);
     return `<div class="t-acc acc" data-open="false">
@@ -89,7 +99,6 @@
         <div class="link-row">
           ${p.yt ? linkBtn("Striver's video", U.ytUrl(p.yt), 'youtube-logo') : linkBtn('Find a video', U.ytSearch('take U forward ' + p.t + ' java'), 'magnifying-glass')}
           ${lecV ? linkBtn(`Babbar, lecture ${lecV.lec}`, U.ytUrl(lec), 'youtube-logo') : ''}
-          ${p.tuf ? linkBtn('Article', p.tuf, 'book-open') : ''}
           ${p.lc ? linkBtn('Editorial', U.lcEditorial(p.lc), 'book-open') + linkBtn('Java solutions', U.lcSolutions(p.lc), 'code') : ''}
           <button class="btn btn-quiet" data-act="ai-tutor" data-ref="${ref}">${U.icon('robot', 16)}<span>Ask AI as a tutor</span></button>
         </div>
@@ -158,14 +167,14 @@
     return `<div class="panel-inner" data-ref="${ref}" data-mode="${mode}">
       <header class="panel-head">
         <h2>${U.esc(p.t)}</h2>
-        <div class="meta">${ui.diff(p.d)}${src ? `<span class="chip">${src}</span>` : ''}${p.prem ? '<span class="chip">LeetCode Premium</span>' : ''}${loc ? `<span class="muted">${U.esc(loc.unit.title)}</span>` : ''}
+        <div class="meta">${E.showDiff(ref) ? ui.diff(p.d) : ''}${E.isBlind75(p) ? '<span class="chip">Blind 75</span>' : ''}${src ? `<span class="chip">${src}</span>` : ''}${p.prem ? '<span class="chip">LeetCode Premium</span>' : ''}${loc ? `<span class="muted">${U.esc(loc.unit.title)}</span>` : ''}
           <button class="pin ${it.pinned ? 'is-on' : ''}" data-act="pin" data-ref="${ref}" title="${it.pinned ? 'Unpin' : 'Pin to the Notebook'}" aria-pressed="${!!it.pinned}">${U.icon('push-pin', 16)}</button></div>
       </header>
       ${mode !== 'again' ? `<p class="instruction">${U.esc(instruction(ref, mode, it))}</p>` : ''}
       ${mode !== 'recall' ? `<div class="panel-actions">
-        ${p.d === 'T' ? (p.tuf ? `<a class="btn btn-primary" href="${p.tuf}" target="_blank" rel="noopener">${U.icon('book-open', 16)}<span>Read it</span></a>` : '') : `<a class="btn btn-primary" href="${link.url}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}">${U.icon('arrow-square-out', 16)}<span>Open on ${link.label}</span></a>${timer}`}
+        ${p.d === 'T' ? `<a class="btn btn-primary" href="${p.gfg || U.google(p.t + ' java explained')}" target="_blank" rel="noopener">${U.icon('book-open', 16)}<span>Read about it</span></a>` :`<a class="btn btn-primary" href="${link.url}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}">${U.icon('arrow-square-out', 16)}<span>Open on ${link.label}</span></a>${timer}`}
       </div>` : ''}
-      ${p.d !== 'T' && !(mode === 'recall' && !ui._revealed[ref]) ? helpBlock(ref, p) : ''}
+      ${p.d !== 'T' && !(mode === 'recall' && !ui._revealed[ref]) ? helpBlock(ref, p, mode) : ''}
       ${notesBlock(ref, mode, it)}
       ${outcome}
       ${step ? '' : history}
@@ -269,7 +278,7 @@
   ui.on('undo', el => { E.undo(el.dataset.ref); S.commit({ silent: true }); ui.refreshSheet(); ui.render(); });
   ui.on('skip', el => { const step = ui.findStep(el.dataset.step); if (!step) return; E.skipStep(step); S.commit({ silent: true }); ui._sel = null; ui.render(); ui.toast(step.kind === 'again' ? 'Moved to tomorrow.' : 'Saved for tomorrow.'); });
   ui.on('ai-tutor', async el => {
-    const p = E.problem(E.idOf(el.dataset.ref)); const url = p.lc ? U.lcUrl(p.lc) : p.gfg || p.tuf || '';
+    const p = E.problem(E.idOf(el.dataset.ref)); const url = p.lc ? U.lcUrl(p.lc) : p.gfg || '';
     const text = `You are my DSA tutor. Problem: "${p.t}"${url ? ` (${url})` : ''}. I code in Java.\n\nRules:\n- Do not give me code or the full solution.\n- Ask me one guiding question at a time so I find the approach myself.\n- If I'm still stuck after three questions, give one small hint about the key idea only.\n- When I propose an approach, ask me for its time and space complexity and one edge case.\n\nMy current thinking: `;
     const ok = await U.copy(text);
     ui.toast(ok ? 'Tutor prompt copied. Paste it into Claude.' : 'Could not copy the prompt.');
@@ -284,11 +293,15 @@
     const fresh = wrap.firstElementChild; panelInner.replaceWith(fresh); ui.bindFields(fresh.parentNode);
   };
 
-  // Live timers
+  // Live timers, and the challenge hint lock counting down with them
   setInterval(() => {
     const t = S.state && S.state.timer; if (!t) return;
     document.querySelectorAll(`[data-timer="${t.ref}"]`).forEach(n => { n.textContent = U.fmtClock(E.timerSeconds(t.ref)); });
+    document.querySelectorAll(`[data-unlock-ref="${t.ref}"]`).forEach(n => {
+      if (lockLeft(t.ref) > 0) n.textContent = lockText(t.ref); else ui.rerenderPanel(n.closest('.panel-inner'));
+    });
   }, 1000);
+  ui.on('unlock-hints', el => { S.item(el.dataset.ref).hintUnlocked = true; S.save(); ui.rerenderPanel(el.closest('.panel-inner')); });
 
   // ───────────────────────── Global wiring
   ui.init = () => {

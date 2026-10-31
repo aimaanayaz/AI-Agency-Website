@@ -12,7 +12,8 @@
     if (s.mode === 'recall') return `${E.lastSeenText(it)}, quick recall`;
     if (s.mode === 'resolve') return `${E.lastSeenText(it)}, re-solve`;
     if (s.mode === 'read') return 'Concept';
-    return `${{ E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] || ''}${p.src === 'boss' ? ', unit challenge' : ''}`;
+    const diff = E.showDiff(s.ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] || '' : 'Problem';
+    return `${diff}${E.isBlind75(p) ? ', Blind 75' : ''}${p.src === 'boss' ? ', unit challenge' : ''}`;
   }
 
   function row(s, sel) {

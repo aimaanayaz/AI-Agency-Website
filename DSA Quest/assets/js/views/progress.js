@@ -38,6 +38,15 @@
         <span class="growth-when"><span class="muted">${U.plural(r.returns, 'return')}</span><span class="num muted">${U.fmtDay(r.d)}</span></span></li>`).join('')}</ul>`;
   }
 
+  // Where you stand on the A2Z sheet: by difficulty (plus the Blind 75 classics), then by topic.
+  function stand() {
+    const b = E.breakdown(), L = { E: 'Easy', M: 'Medium', H: 'Hard' };
+    const row = (label, c) => `<li class="${c.total && c.done === c.total ? 'is-complete' : ''}"><span class="stand-label">${label}</span><span class="mini-bar"><span style="width:${c.total ? Math.round((c.done / c.total) * 100) : 0}%"></span></span><span class="num muted">${c.done}/${c.total}</span></li>`;
+    return `<ul class="stand">${b.byDiff.map(x => row(L[x.d], x)).join('')}${row('Blind 75 classics', b.blind)}</ul>
+      <h3 class="stand-h">By topic</h3>
+      <ul class="stand stand-topics">${b.topics.map(t => row(U.esc(t.title), t)).join('')}</ul>`;
+  }
+
   function mix() {
     const counts = {}; let total = 0;
     Object.values(S.state.items).forEach(it => { if (it.firstOutcome && E.OUTCOMES[it.firstOutcome]) { counts[it.firstOutcome] = (counts[it.firstOutcome] || 0) + 1; total++; } });
@@ -87,6 +96,7 @@
         <header class="page-head"><h1>Progress</h1></header>
         ${summary()}
         <section class="block"><h2>Then and now</h2>${growth()}</section>
+        <section class="block"><h2>Where you stand</h2>${stand()}</section>
         <section class="block"><h2>How first attempts went</h2>${mix()}</section>
         <section class="block"><h2>Study days</h2>${calendar()}</section>
         <section class="block"><h2>Finish line</h2>

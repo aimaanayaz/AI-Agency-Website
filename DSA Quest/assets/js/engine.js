@@ -24,9 +24,16 @@
     if (p.gfg) return { label: 'GeeksforGeeks', url: p.gfg, kind: 'gfg' };
     if (p.spoj) return { label: 'SPOJ', url: p.spoj, kind: 'spoj' };
     if (p.ib) return { label: 'InterviewBit', url: p.ib, kind: 'ib' };
-    if (p.tuf) return { label: 'takeUforward', url: p.tuf, kind: 'tuf' };
-    return { label: 'Search', url: U.google(p.t + ' problem practice'), kind: 'search' };
+    return { label: 'a search', url: U.google(p.t + ' problem practice'), kind: 'search' };
   };
+
+  // The original Blind 75: the most repeated interview problems. Shown as a tag, never as a separate list.
+  const BLIND75 = new Set(D.blind75 || []);
+  E.isBlind75 = p => !!(p && p.lc && BLIND75.has(p.lc));
+  // "Hide difficulty until solved": like an interview, you don't know if it's Easy or Hard going in.
+  E.showDiff = ref => !st().profile.hideDifficulty || E.isSolved(ref);
+  // A unit challenge keeps its hints closed for the first 25 minutes on the timer.
+  E.CHALLENGE_LOCK_MIN = 25;
 
   // Lectures longer than 50 minutes are split into parts of about 40 minutes.
   E.videoParts = id => {
@@ -118,6 +125,18 @@
   E.sectionProgress = sec => { let done = 0, total = 0; sec.units.forEach(u => { const p = E.unitProgress(u); done += p.done; total += p.total; }); return { done, total, pct: total ? done / total : 1, complete: done === total }; };
   E.a2zIds = (() => { const s = new Set(); D.sheet.filter(t => !['babbar', 'boss'].includes(t.key)).forEach(t => t.sections.forEach(x => x.items.forEach(id => s.add(id)))); return [...s]; })();
   E.a2zProgress = () => { const done = E.a2zIds.filter(id => E.isDone('p:' + id)).length; return { done, total: E.a2zIds.length, pct: done / E.a2zIds.length }; };
+  // Where you stand on the A2Z sheet: by difficulty, by topic, and how many Blind 75 classics are done.
+  E.breakdown = () => {
+    const count = ids => ({ done: ids.filter(id => E.isDone('p:' + id)).length, total: ids.length });
+    const byDiff = ['E', 'M', 'H'].map(d => Object.assign({ d }, count(E.a2zIds.filter(id => P[id] && P[id].d === d))));
+    const topics = D.sheet.filter(t => !['babbar', 'boss'].includes(t.key)).map(t => {
+      const ids = [...new Set(t.sections.flatMap(x => x.items))];
+      return Object.assign({ key: t.key, title: t.title }, count(ids));
+    });
+    const seen = new Set(), blind = [];
+    Object.keys(P).forEach(id => { const p = P[id]; if (E.isBlind75(p) && !seen.has(p.lc)) { seen.add(p.lc); blind.push(id); } });
+    return { byDiff, topics, blind: count(blind) };
+  };
   E.currentUnit = () => E.idx.units.find(u => !E.unitProgress(u).complete) || E.idx.units[E.idx.units.length - 1];
 
   // Remaining new work, in order, with long lectures expanded into their remaining parts.

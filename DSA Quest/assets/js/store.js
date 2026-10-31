@@ -17,6 +17,7 @@
       restDays: [],
       extras: true,       // Babbar's extra lecture problems in the daily session
       bosses: true,       // one unseen "challenge" problem at the end of each unit
+      hideDifficulty: false, // hide Easy/Medium/Hard until a problem is solved
       estimates: { E: 20, M: 40, H: 65, T: 10 },
       theme: 'system',
       ritual: { text: '', url: '' },

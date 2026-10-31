@@ -19,7 +19,8 @@
           <div class="set-row"><span><b>Time per day</b><span class="muted small">The session fills this. About a quarter goes to earlier problems coming back.</span></span>${seg('dailyMinutes', [[45, '45 min'], [60, '60 min'], [75, '75 min'], [90, '90 min'], [120, '2 h']], p.dailyMinutes)}</div>
           <div class="set-row"><span><b>Rest days</b><span class="muted small">No session, and the streak is safe.</span></span><div class="seg">${DAYS.map((d, i) => `<button aria-pressed="${p.restDays.includes(i)}" data-act="rest" data-d="${i}">${d}</button>`).join('')}</div></div>
           ${toggle('extras', "Babbar's extra problems", 'The problems Babbar solves in his lectures, beyond Striver A2Z.', p.extras)}
-          ${toggle('bosses', 'Unit challenge', 'One unseen problem at the end of each unit, to check you own it.', p.bosses)}
+          ${toggle('bosses', 'Unit challenge', 'One unseen problem at the end of each unit, to check you own it. Hints stay closed for the first 25 minutes, like an interview.', p.bosses)}
+          ${toggle('hideDifficulty', 'Hide difficulty until solved', "Like a real interview: you don't know if a problem is Easy or Hard until you've solved it.", p.hideDifficulty)}
           <p class="muted small">With these settings you finish around <b>${U.fmtMonth(plan.eta)}</b>.</p>
         </section>
 
