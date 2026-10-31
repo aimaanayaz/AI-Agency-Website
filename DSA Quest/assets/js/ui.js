@@ -5,7 +5,7 @@
   DQ.views = DQ.views || {};
   ui.on = (name, fn) => { ui.actions[name] = fn; };
 
-  const NAV = [['today', 'Today', 'house'], ['path', 'Path', 'path'], ['notebook', 'Notebook', 'notebook'], ['progress', 'Progress', 'chart-line-up']];
+  const NAV = [['today', 'Path', 'path'], ['path', 'Syllabus', 'list-checks'], ['notebook', 'Notebook', 'notebook'], ['progress', 'Progress', 'chart-line-up']];
 
   // ───────────────────────── Router
   ui.route = () => location.hash.replace(/^#\/?/, '').split('?')[0] || 'today';
@@ -26,13 +26,13 @@
   };
 
   ui.renderSidebar = () => {
-    const r = ui.route(), streak = E.streak(), today = S.state.days[U.today()] || { minutes: 0 };
+    const r = ui.route(), streak = E.streak();
     document.getElementById('sidebar').innerHTML = `
       <a class="brand" href="#/today"><span class="brand-mark">DQ</span><span>DSA Quest</span></a>
       <nav class="nav" aria-label="Main">${NAV.map(([id, label, ic]) => `<a class="nav-item" href="#/${id}" ${r === id ? 'aria-current="page"' : ''}>${U.icon(ic)}<span>${label}</span></a>`).join('')}</nav>
       <div class="side-foot">
         <div class="side-stat">${U.icon('fire', 16)}<span>${streak ? U.plural(streak, 'day') + ' in a row' : 'Start a streak today'}</span></div>
-        <div class="side-stat">${U.icon('clock', 16)}<span class="num">${Math.round(today.minutes)} min today</span></div>
+        <div class="side-stat">${U.icon('check-circle', 16)}<span><span class="num">${E.doneToday()}</span> done today</span></div>
         ${DQ.sync.enabled ? `<div class="side-stat sync-line" id="sync-line">${ui.syncLine()}</div>` : ''}
         <a class="nav-item" href="#/settings" ${r === 'settings' ? 'aria-current="page"' : ''}>${U.icon('gear-six')}<span>Settings</span></a>
       </div>`;
@@ -132,21 +132,19 @@
     const timer = `<button class="timer ${timerOn && S.state.timer.running ? 'is-running' : ''}" data-act="timer" data-ref="${ref}" title="${timerOn ? 'Pause or resume' : 'Start the timer'}">${U.icon('timer', 16)}<span class="num" data-timer="${ref}">${U.fmtClock(E.timerSeconds(ref))}</span></button>`;
 
     if (kind === 'video') {
-      const id = E.idOf(ref), v = E.video(id) || { t: 'Lecture', dur: 0 }, n = E.videoParts(id);
-      const part = step ? step.part || 0 : Math.min(it.parts || 0, n - 1);
-      const [a, b] = E.partRange(id, part);
-      const chapters = (v.ch || []).filter(([t]) => t >= a && t < b);
+      const id = E.idOf(ref), v = E.video(id) || { t: 'Lecture', dur: 0 };
+      const chapters = v.ch || [];
       return `<div class="panel-inner" data-ref="${ref}">
         <header class="panel-head"><h2>${U.esc(v.t)}</h2>
-          <div class="meta">${v.src === 'babbar' ? '<span class="chip">Babbar, Java</span>' : '<span class="chip">Striver</span>'}${n > 1 ? `<span class="chip">Part ${part + 1} of ${n}</span>` : ''}<span class="muted num">${U.fmtClock(a)} to ${U.fmtClock(b)}</span></div></header>
-        <a class="video" href="${U.ytUrl(id, a)}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}"><img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy"><span class="video-play">${U.icon('play', 22)}</span></a>
-        <p class="instruction">Watch at 1.25x and pause to write the code yourself before Babbar does.${n > 1 ? ` Today: ${U.fmtClock(a)} to ${U.fmtClock(b)}.` : ''}</p>
+          <div class="meta">${v.src === 'babbar' ? '<span class="chip">Babbar, Java</span>' : '<span class="chip">Striver</span>'}${v.dur ? `<span class="muted"><span class="num">${Math.round(v.dur / 60)}</span> min</span>` : ''}</div></header>
+        <a class="video" href="${U.ytUrl(id)}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}"><img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy"><span class="video-play">${U.icon('play', 22)}</span></a>
+        <p class="instruction">Watch at your own speed and pause to write the code yourself before Babbar does. Mark it watched whenever you finish, in one go or over a few sittings.</p>
         ${chapters.length ? `<div class="chapters">${chapters.map(([t, l]) => `<a href="${U.ytUrl(id, t)}" target="_blank" rel="noopener"><span class="num">${U.fmtClock(t)}</span>${U.esc(l)}</a>`).join('')}</div>` : ''}
         ${notesBlock(ref, 'watch', it)}
         <div class="panel-actions">
           ${mode === 'watch-all' && E.isDone(ref) ? `<button class="btn" data-act="undo" data-ref="${ref}">${U.icon('arrow-counter-clockwise', 16)}<span>Mark as not watched</span></button>`
-            : `<button class="btn btn-primary" data-act="watched" data-ref="${ref}" data-part="${part}">${U.icon('check', 16)}<span>${n > 1 ? `Mark part ${part + 1} as watched` : 'Mark as watched'}</span></button>`}
-          ${step ? `<button class="btn btn-quiet" data-act="skip" data-step="${step.id}">${U.icon('skip-forward', 16)}<span>Not today</span></button>` : ''}
+            : `<button class="btn btn-primary" data-act="watched" data-ref="${ref}">${U.icon('check', 16)}<span>Mark as watched</span></button>`}
+          ${step ? `<button class="btn btn-quiet" data-act="skip" data-step="${step.id}">${U.icon('skip-forward', 16)}<span>Skip for now</span></button>` : ''}
         </div>
       </div>`;
     }
@@ -178,13 +176,13 @@
       ${notesBlock(ref, mode, it)}
       ${outcome}
       ${step ? '' : history}
-      ${step ? `<div class="panel-foot"><button class="link" data-act="skip" data-step="${step.id}">${U.icon('skip-forward', 14)}Not today</button></div>` : (done ? `<div class="panel-foot"><button class="link" data-act="undo" data-ref="${ref}">${U.icon('arrow-counter-clockwise', 14)}Mark as not done</button></div>` : '')}
+      ${step ? `<div class="panel-foot"><button class="link" data-act="skip" data-step="${step.id}">${U.icon('skip-forward', 14)}Skip for now</button></div>` : (done ? `<div class="panel-foot"><button class="link" data-act="undo" data-ref="${ref}">${U.icon('arrow-counter-clockwise', 14)}Mark as not done</button></div>` : '')}
     </div>`;
   };
 
   // ───────────────────────── Recording an outcome
   ui._revealed = {};
-  ui.findStep = id => { const s = S.state.sessions[U.today()]; return s ? s.steps.find(x => x.id === id) : null; };
+  ui.findStep = id => E.findStep(id);
   ui.recordFrom = (ref, outcome, stepOverride) => {
     let step = stepOverride || (ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : null);
     if (!step) step = E.isSolved(ref) ? { ref, kind: 'again', mode: 'resolve' } : { ref, kind: 'new', mode: E.kindOf(ref) === 'theory' ? 'read' : 'solve' };
@@ -195,7 +193,7 @@
     return events;
   };
   ui.afterRecord = events => {
-    ui._sel = null;
+    ui._sel = null; ui._arrived = true;
     events.forEach(e => { if (e.type === 'unit' || e.type === 'reward') ui.logWin(e); });
     if (ui._sheetRef) ui.refreshSheet();
     ui.render();
@@ -271,12 +269,12 @@
   ui.on('choose', el => ui.afterRecord(ui.recordFrom(el.dataset.ref, el.dataset.outcome)));
   ui.on('read', el => ui.afterRecord(ui.recordFrom(el.dataset.ref, 'done')));
   ui.on('watched', el => {
-    const ref = el.dataset.ref, part = Number(el.dataset.part || 0);
-    const step = ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : { ref, kind: 'new', mode: 'watch', part };
+    const ref = el.dataset.ref;
+    const step = ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : { ref, kind: 'new', mode: 'watch' };
     ui.afterRecord(ui.recordFrom(ref, 'done', step));
   });
   ui.on('undo', el => { E.undo(el.dataset.ref); S.commit({ silent: true }); ui.refreshSheet(); ui.render(); });
-  ui.on('skip', el => { const step = ui.findStep(el.dataset.step); if (!step) return; E.skipStep(step); S.commit({ silent: true }); ui._sel = null; ui.render(); ui.toast(step.kind === 'again' ? 'Moved to tomorrow.' : 'Saved for tomorrow.'); });
+  ui.on('skip', el => { const step = ui.findStep(el.dataset.step); if (!step) return; E.skipStep(step); S.commit({ silent: true }); ui._sel = null; ui.render(); ui.toast(step.kind === 'again' ? 'It will come back a little later.' : 'Moved behind the next step.'); });
   ui.on('ai-tutor', async el => {
     const p = E.problem(E.idOf(el.dataset.ref)); const url = p.lc ? U.lcUrl(p.lc) : p.gfg || '';
     const text = `You are my DSA tutor. Problem: "${p.t}"${url ? ` (${url})` : ''}. I code in Java.\n\nRules:\n- Do not give me code or the full solution.\n- Ask me one guiding question at a time so I find the approach myself.\n- If I'm still stuck after three questions, give one small hint about the key idea only.\n- When I propose an approach, ask me for its time and space complexity and one edge case.\n\nMy current thinking: `;

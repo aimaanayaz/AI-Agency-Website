@@ -5,8 +5,7 @@
   function summary() {
     const a2z = E.a2zProgress(), locked = E.lockedCount();
     let days = 0; for (let i = 0; i < 14; i++) if (E.isActive(U.addDays(U.today(), -i))) days++;
-    const avg = Math.round(E.recentMinutesPerDay());
-    return `<p class="lede">You have done <b>${a2z.done} of ${a2z.total}</b> Striver A2Z problems. ${locked ? `<b>${locked}</b> ${locked === 1 ? 'is' : 'are'} locked in, meaning you solved ${locked === 1 ? 'it' : 'them'} cleanly again weeks later.` : 'None is locked in yet. A problem locks in when you solve it cleanly again weeks later.'} You studied <b>${days} of the last 14 days</b>, about ${avg} minutes a day.</p>`;
+    return `<p class="lede">You have done <b>${a2z.done} of ${a2z.total}</b> Striver A2Z problems. ${locked ? `<b>${locked}</b> ${locked === 1 ? 'is' : 'are'} locked in, meaning you solved ${locked === 1 ? 'it' : 'them'} cleanly again weeks later.` : 'None is locked in yet. A problem locks in when you solve it cleanly again weeks later.'} You studied on <b>${days} of the last 14 days</b>.</p>`;
   }
 
   // One row per problem: its first solve against its latest re-solve (like with like). Recalls are counted, never timed against a solve.
@@ -65,9 +64,9 @@
       for (let d = 0; d < 7; d++) {
         const k = U.addDays(start, w * 7 + d);
         if (k > today) { cells.push('<i class="cal-cell is-future"></i>'); continue; }
-        const m = (S.state.days[k] || { minutes: 0 }).minutes;
-        const l = m === 0 ? 0 : m < 30 ? 1 : m < 60 ? 2 : m < 90 ? 3 : 4;
-        cells.push(`<i class="cal-cell l${l}" title="${U.fmtDay(k, { weekday: 'short', day: 'numeric', month: 'short' })}: ${Math.round(m)} min"></i>`);
+        const n = (S.state.days[k] || { steps: 0 }).steps;
+        const l = n === 0 ? 0 : n < 3 ? 1 : n < 5 ? 2 : n < 8 ? 3 : 4;
+        cells.push(`<i class="cal-cell l${l}" title="${U.fmtDay(k, { weekday: 'short', day: 'numeric', month: 'short' })}: ${U.plural(n, 'step')}"></i>`);
       }
       cols.push(`<span class="cal-col">${cells.join('')}</span>`);
     }
@@ -90,8 +89,7 @@
 
   DQ.views.progress = {
     render() {
-      const plan = E.plan(), p = S.state.profile, pace = E.recentMinutesPerDay();
-      const realEta = pace > 10 && plan.totalMin ? U.addDays(U.today(), Math.ceil(plan.totalMin / (pace * 0.72))) : null;
+      const p = S.state.profile;
       return `<div class="page narrow">
         <header class="page-head"><h1>Progress</h1></header>
         ${summary()}
@@ -99,11 +97,9 @@
         <section class="block"><h2>Where you stand</h2>${stand()}</section>
         <section class="block"><h2>How first attempts went</h2>${mix()}</section>
         <section class="block"><h2>Study days</h2>${calendar()}</section>
-        <section class="block"><h2>Finish line</h2>
-          <p>At ${p.dailyMinutes} minutes a day: <b>${U.fmtLong(plan.eta)}</b>. ${Math.round(plan.totalMin / 60)} hours of lectures and problems left.${realEta ? ` At your pace over the last two weeks: <b>${U.fmtMonth(realEta)}</b>.` : ''}</p></section>
         <section class="block"><h2>Your rewards</h2>${rewards()}</section>
         <section class="block"><h2>Session ritual</h2>
-          <p class="muted small">Keep something you enjoy only for DSA time, like a playlist. Pairing a treat with the work made people show up about 50% more often in a study of gym habits. It appears at the top of Today.</p>
+          <p class="muted small">Keep something you enjoy only for DSA time, like a playlist. Pairing a treat with the work made people show up about 50% more often in a study of gym habits. It appears at the top of your path.</p>
           <div class="rw-form"><label class="field grow"><span class="field-label">Only during DSA</span><input class="input" data-prof-ritual="text" value="${U.esc(p.ritual.text)}" placeholder="My lo-fi focus playlist"></label>
           <label class="field grow"><span class="field-label">Link (optional)</span><input class="input" data-prof-ritual="url" value="${U.esc(p.ritual.url)}" placeholder="https://open.spotify.com/..."></label></div></section>
       </div>`;

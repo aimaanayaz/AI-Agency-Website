@@ -1,5 +1,5 @@
-/* Engine: journey index, outcomes and resurfacing, the daily session, lectures split into parts,
-   growth proof, user rewards, streak and the finish-date plan. */
+/* Engine: journey index, outcomes and resurfacing, the path as one ordered line (with due revisits slipped in),
+   growth proof, user rewards and the streak. No days, no time budgets: Aimaan sets his own pace. */
 (function () {
   const DQ = window.DQ, U = DQ.U, S = DQ.store, D = window.DQ_DATA;
   const E = { version: 0 };
@@ -31,29 +31,9 @@
   const BLIND75 = new Set(D.blind75 || []);
   E.isBlind75 = p => !!(p && p.lc && BLIND75.has(p.lc));
   // "Hide difficulty until solved": like an interview, you don't know if it's Easy or Hard going in.
-  E.showDiff = ref => !st().profile.hideDifficulty || E.isSolved(ref);
+  E.showDiff = ref => !prof().hideDifficulty || E.isSolved(ref);
   // A unit challenge keeps its hints closed for the first 25 minutes on the timer.
   E.CHALLENGE_LOCK_MIN = 25;
-
-  // Lectures longer than 50 minutes are split into parts of about 40 minutes.
-  E.videoParts = id => {
-    const v = videoMeta[id]; const min = v ? v.dur / 60 : 30;
-    return min > 50 ? Math.ceil(min / 40) : 1;
-  };
-  E.partRange = (id, k) => {
-    const v = videoMeta[id] || { dur: 1800 }; const n = E.videoParts(id); const len = v.dur / n;
-    return [Math.round(k * len), Math.round(Math.min(v.dur, (k + 1) * len))];
-  };
-
-  E.problemEstimate = p => (prof().estimates[p.d] || 40);
-  E.stepEstimate = step => {
-    if (step.mode === 'watch') { const [a, b] = E.partRange(E.idOf(step.ref), step.part || 0); return (b - a) / 60; }
-    const p = P[E.idOf(step.ref)]; if (!p) return 20;
-    if (step.mode === 'recall') return 5;
-    if (step.mode === 'resolve') return U.clamp(Math.round(E.problemEstimate(p) * 0.6), 10, 40);
-    if (step.mode === 'read') return prof().estimates.T || 10;
-    return E.problemEstimate(p);
-  };
 
   // ─────────────────────────────── Journey index
   const NEW_LECTURE_RULES = [
@@ -76,7 +56,7 @@
       const sec = { id: s.id, title: s.title, sub: s.sub, index: si, units: [] };
       idx.sections.push(sec);
       s.units.forEach(u => {
-        const unit = { id: u.id, title: u.title, desc: u.desc, guide: u.guide, cleared: !!u.cleared, section: sec, lessons: [], boss: (u.boss || []).slice(), index: idx.units.length };
+        const unit = { id: u.id, title: u.title, desc: u.desc, story: u.story, guide: u.guide, cleared: !!u.cleared, section: sec, lessons: [], boss: (u.boss || []).slice(), index: idx.units.length };
         const lessons = u.lessons.slice();
         if (fresh[u.id]) lessons.unshift({ title: 'New from Babbar', items: fresh[u.id], fresh: true });
         lessons.forEach((l, li) => {
@@ -99,7 +79,7 @@
     E.idx = idx;
   };
 
-  // Whether an item belongs to the daily plan (optional items stay reachable from the Path).
+  // Whether an item belongs on the line (optional items stay reachable from the Syllabus).
   E.isRequired = (entry, unit) => {
     if (entry.optional) return false;
     const p = !E.isVideo(entry.ref) && P[E.idOf(entry.ref)];
@@ -139,22 +119,6 @@
   };
   E.currentUnit = () => E.idx.units.find(u => !E.unitProgress(u).complete) || E.idx.units[E.idx.units.length - 1];
 
-  // Remaining new work, in order, with long lectures expanded into their remaining parts.
-  E.newQueue = () => {
-    const out = [];
-    E.idx.units.forEach(u => {
-      u.lessons.forEach(l => l.items.forEach(i => {
-        if (!E.isRequired(i, u) || E.isDone(i.ref)) return;
-        if (E.isVideo(i.ref)) {
-          const n = E.videoParts(E.idOf(i.ref)), seen = (S.peek(i.ref) || {}).parts || 0;
-          for (let k = seen; k < n; k++) out.push({ ref: i.ref, mode: 'watch', part: k, parts: n });
-        } else out.push({ ref: i.ref, mode: P[E.idOf(i.ref)].d === 'T' ? 'read' : 'solve' });
-      }));
-      const ch = E.challengeOf(u); if (ch && !E.isDone(ch)) out.push({ ref: ch, mode: 'solve', challenge: true });
-    });
-    return out;
-  };
-
   // ─────────────────────────────── Outcomes and resurfacing
   E.OUTCOMES = {
     clean: { label: 'Solved it cleanly', sub: 'Optimal approach, on my own', rank: 6, tone: 'good' },
@@ -171,6 +135,7 @@
   };
   E.outcomeMeta = o => E.OUTCOMES[o] || E.RECALL[o] || (o === 'imported' ? { label: 'Done on the old tracker', rank: 4, tone: 'muted' } : null);
 
+  // Memory still fades with real time, so a solved problem comes back after a number of days that depends on how it went.
   const fuzz = (ref, iv) => (iv > 7 ? Math.round(iv * (0.9 + (U.hash(ref + iv) % 21) / 100)) : iv);
   function schedule(ref, it, outcome, mode) {
     const prev = it.interval || 0; let iv, next;
@@ -195,23 +160,17 @@
     it.locked = good && iv >= 30 ? true : (good ? !!it.locked : false);
   }
 
-  const bumpDay = (mins) => { const k = U.today(); const d = st().days[k] || (st().days[k] = { minutes: 0, steps: 0 }); d.minutes += mins || 0; d.steps += 1; };
+  const bumpDay = mins => { const k = U.today(); const d = st().days[k] || (st().days[k] = { minutes: 0, steps: 0 }); d.minutes += mins || 0; d.steps += 1; };
 
   // Record any step. Returns events for the UI (growth, unit cleared, reward earned…).
   E.record = (step, outcome, mins) => {
     const ref = step.ref, it = S.item(ref), events = [];
-    const est = Math.round(E.stepEstimate(step));
     const m = mins || 0;
-    const loggedMins = m || est;
     const lockedBefore = !!it.locked;
     const unitWas = E.idx.loc[ref] ? E.unitProgress(E.idx.loc[ref].unit).complete : true;
     const secWas = E.idx.loc[ref] ? E.sectionProgress(E.idx.loc[ref].unit.section).complete : true;
 
-    if (step.mode === 'watch') {
-      const n = E.videoParts(E.idOf(ref));
-      it.parts = Math.max(it.parts || 0, (step.part || 0) + 1);
-      if (it.parts >= n) { it.status = 'done'; it.doneAt = Date.now(); }
-    } else if (step.mode === 'read') {
+    if (step.mode === 'watch' || step.mode === 'read') {
       it.status = 'done'; it.doneAt = Date.now();
     } else {
       const meta = E.outcomeMeta(outcome);
@@ -233,10 +192,13 @@
       schedule(ref, it, outcome, step.mode);
       if (it.locked && !lockedBefore) events.push({ type: 'locked', ref });
     }
-    bumpDay(loggedMins);
-    // Mark it in today's session wherever it appears.
-    const sess = st().sessions[U.today()];
-    if (sess) sess.steps.forEach(s => { if (s.ref === ref && !s.done && (s.mode !== 'watch' || s.part === step.part)) { s.done = true; s.outcome = outcome || 'done'; s.mins = m; } });
+    bumpDay(m);
+    // What happened last decides what comes next (one revisit after each new problem), and feeds "Just done".
+    const kind = step.kind === 'again' ? 'again' : step.mode === 'watch' ? 'new-watch' : 'new-solve';
+    st().lastKind = kind; st().lastAt = Date.now();
+    if (kind === 'again') st().sinceRevisit = 0; else if (kind === 'new-solve') st().sinceRevisit = (st().sinceRevisit || 0) + 1;
+    if (kind !== 'again') st().skipped = [];
+    st().log = (st().log || []).concat([{ ref, kind, mode: step.mode, outcome: outcome || 'done', at: Date.now(), mins: m }]).slice(-40);
     // Milestones
     const loc = E.idx.loc[ref];
     if (loc && !unitWas && E.unitProgress(loc.unit).complete && !loc.unit.cleared) events.push({ type: 'unit', unit: loc.unit });
@@ -246,103 +208,74 @@
     return events;
   };
 
-  E.skipStep = step => {
-    const sess = st().sessions[U.today()];
-    if (sess) sess.steps = sess.steps.filter(s => s !== step && !(s.ref === step.ref && s.part === step.part && !s.done));
-    if (step.kind === 'again') { const it = S.item(step.ref); it.next = U.addDays(U.today(), 1); }
-    else { (st().deferred = st().deferred || {})[step.ref] = U.addDays(U.today(), 1); }
-    E.version++;
-  };
-
   E.undo = ref => {
     const it = S.peek(ref); if (!it) return;
     ['status', 'doneAt', 'outcome', 'firstOutcome', 'next', 'interval', 'mode', 'locked', 'aim', 'parts'].forEach(k => delete it[k]);
     it.attempts = [];
-    Object.values(st().sessions).forEach(s => s.steps.forEach(x => { if (x.ref === ref) { x.done = false; delete x.outcome; } }));
+    st().log = (st().log || []).filter(x => x.ref !== ref);
     E.version++;
   };
 
-  // ─────────────────────────────── The daily session
-  E.isRestDay = k => (prof().restDays || []).includes(U.weekday(k));
-  E.dueAgain = (k = U.today()) => Object.entries(st().items)
-    .filter(([ref, it]) => it.status === 'done' && it.next && it.next <= k && !E.isVideo(ref) && P[E.idOf(ref)] && P[E.idOf(ref)].d !== 'T')
-    .map(([ref, it]) => ({ ref, it, overdue: U.diffDays(it.next, k) }))
-    .sort((a, b) => b.overdue - a.overdue || ((E.outcomeMeta(a.it.outcome) || {}).rank || 3) - ((E.outcomeMeta(b.it.outcome) || {}).rank || 3));
+  // ─────────────────────────────── The line: the path in order, earlier problems slipped in when due
+  E.dueAgain = () => {
+    const k = U.today();
+    return Object.entries(st().items)
+      .filter(([ref, it]) => it.status === 'done' && it.next && it.next <= k && !E.isVideo(ref) && P[E.idOf(ref)] && P[E.idOf(ref)].d !== 'T')
+      .map(([ref, it]) => ({ ref, it, overdue: U.diffDays(it.next, k) }))
+      .sort((a, b) => b.overdue - a.overdue || ((E.outcomeMeta(a.it.outcome) || {}).rank || 3) - ((E.outcomeMeta(b.it.outcome) || {}).rank || 3));
+  };
+  const againStep = (ref, it) => ({ id: 'again:' + ref, ref, kind: 'again', mode: it.mode === 'recall' ? 'recall' : 'resolve', aim: it.aim || null });
 
-  function againStep(ref, it) { return { ref, kind: 'again', mode: it.mode === 'recall' ? 'recall' : 'resolve', aim: it.aim || null }; }
+  // Everything new that is left, in teaching order. "Skip for now" moves an item behind the next one.
+  E.newQueue = () => {
+    const out = [];
+    E.idx.units.forEach(u => {
+      u.lessons.forEach(l => l.items.forEach(i => {
+        if (!E.isRequired(i, u) || E.isDone(i.ref)) return;
+        out.push({ id: 'new:' + i.ref, ref: i.ref, kind: 'new', mode: E.isVideo(i.ref) ? 'watch' : P[E.idOf(i.ref)].d === 'T' ? 'read' : 'solve' });
+      }));
+      const ch = E.challengeOf(u); if (ch && !E.isDone(ch)) out.push({ id: 'new:' + ch, ref: ch, kind: 'new', mode: 'solve', challenge: true });
+    });
+    const skipped = st().skipped || [];
+    if (!skipped.length) return out;
+    const keep = out.filter(s => !skipped.includes(s.ref)), later = out.filter(s => skipped.includes(s.ref));
+    keep.splice(Math.min(1, keep.length), 0, ...later);
+    return keep;
+  };
 
-  E.buildSession = (day = U.today(), opts = {}) => {
-    const budget = prof().dailyMinutes;
-    const deferred = st().deferred || {};
-    const fresh = E.newQueue().filter(s => !(deferred[s.ref] && deferred[s.ref] > day));
-    // New work first, to know today's patterns.
-    const news = []; let newMin = 0, fi = 0;
-    const newBudget = budget * 0.72;
-    for (; fi < fresh.length; fi++) {
-      const step = Object.assign({ kind: 'new' }, fresh[fi]);
-      const est = E.stepEstimate(step);
-      if (news.length && newMin + est > newBudget * 1.1) break;
-      news.push(step); newMin += est;
-      if (newMin >= newBudget) { fi++; break; }
+  // The next steps, in order. The path is the spine: after every two new problems, one due revisit.
+  // Coming back after a break, a revisit first as a warm-up.
+  const REVISIT_EVERY = 2;
+  E.line = (limit = 12) => {
+    const fresh = E.newQueue(), due = E.dueAgain().map(d => againStep(d.ref, d.it));
+    const returning = !st().lastAt || Date.now() - st().lastAt > 3 * 3600e3;
+    const steps = []; let since = st().sinceRevisit || 0;
+    if (due.length && (returning || since >= REVISIT_EVERY)) { steps.push(due.shift()); since = 0; }
+    for (const s of fresh) {
+      if (steps.length >= limit) break;
+      steps.push(s);
+      if (s.mode !== 'watch') since++;
+      if (since >= REVISIT_EVERY && due.length && steps.length < limit) { steps.push(due.shift()); since = 0; }
     }
-    // Earlier problems that are due, plus warm-ups that share today's patterns.
-    const todaysPatterns = new Set();
-    news.forEach(s => { const p = !E.isVideo(s.ref) && P[E.idOf(s.ref)]; if (p) p.pt.forEach(x => todaysPatterns.add(x)); });
-    const due = E.dueAgain(day);
-    const soon = Object.entries(st().items).filter(([ref, it]) => it.status === 'done' && it.next && it.next > day && it.next <= U.addDays(day, 3) && P[E.idOf(ref)] && !E.isVideo(ref) && P[E.idOf(ref)].pt.some(x => todaysPatterns.has(x)));
-    const again = []; let againMin = 0; const cap = Math.max(budget - newMin, budget * 0.28);
-    for (const d of due) { const s = againStep(d.ref, d.it); const est = E.stepEstimate(s); if (again.length && againMin + est > cap) break; again.push(s); againMin += est; }
-    for (const [ref, it] of soon) { if (again.some(a => a.ref === ref)) continue; const s = againStep(ref, it); const est = E.stepEstimate(s); if (againMin + est > cap * 0.8) break; again.push(s); againMin += est; }
-    // Little due today: the spare time goes to new work.
-    for (; fi < fresh.length; fi++) {
-      const step = Object.assign({ kind: 'new' }, fresh[fi]); const est = E.stepEstimate(step);
-      if (newMin + againMin + est > budget * 1.05) break;
-      news.push(step); newMin += est;
-    }
-    // Interleave: one warm-up, the new work, then the rest of the earlier problems between new problems.
-    const steps = [];
-    const queue = again.slice();
-    if (queue.length) steps.push(queue.shift());
-    news.forEach(s => { steps.push(s); if (s.mode !== 'watch' && queue.length) steps.push(queue.shift()); });
-    steps.push(...queue);
-    steps.forEach((s, i) => { s.id = day + ':' + i; });
-    const sess = { day, steps, built: Date.now(), rest: E.isRestDay(day) && !opts.force };
-    st().sessions[day] = sess;
-    // keep the last 40 sessions
-    const keys = Object.keys(st().sessions).sort(); while (keys.length > 40) delete st().sessions[keys.shift()];
-    return sess;
+    while (steps.length < limit && due.length) steps.push(due.shift());
+    return steps;
   };
-  E.session = () => {
-    const day = U.today();
-    let sess = st().sessions[day];
-    if (!sess) sess = E.isRestDay(day) ? { day, steps: [], rest: true, built: Date.now() } : E.buildSession(day);
-    if (!st().sessions[day]) st().sessions[day] = sess;
-    sess.steps.forEach(s => { if (!s.done && s.mode !== 'watch' && s.kind === 'new' && E.isDone(s.ref)) { s.done = true; s.outcome = (S.peek(s.ref) || {}).outcome || 'done'; } });
-    return sess;
+  E.findStep = id => E.line(200).find(s => s.id === id) || null;
+  E.recent = (n = 3) => (st().log || []).slice(-n).reverse();
+  E.remaining = () => E.newQueue().length;
+
+  E.skipStep = step => {
+    if (step.kind === 'again') { S.item(step.ref).next = U.addDays(U.today(), 1); } // a revisit waits a little
+    else { const s = st().skipped || (st().skipped = []); if (!s.includes(step.ref)) s.push(step.ref); }
+    E.version++;
   };
-  E.studyAnyway = () => { const s = E.buildSession(U.today(), { force: true }); s.rest = false; E.version++; return s; };
-  E.keepGoing = () => {
-    const sess = E.session(); const have = new Set(sess.steps.map(s => s.ref + ':' + (s.part || 0)));
-    const extra = E.newQueue().filter(s => !have.has(s.ref + ':' + (s.part || 0)));
-    let min = 0; const add = [];
-    for (const s of extra) { const step = Object.assign({ kind: 'new' }, s); const est = E.stepEstimate(step); if (add.length && min + est > 30) break; add.push(step); min += est; if (min >= 25) break; }
-    const due = E.dueAgain().filter(d => !have.has(d.ref + ':0')).slice(0, 1).map(d => againStep(d.ref, d.it));
-    const all = due.concat(add);
-    all.forEach((s, i) => { s.id = sess.day + ':x' + Date.now() + i; });
-    sess.steps.push(...all); E.version++;
-    return all.length;
-  };
-  E.sessionStats = sess => {
-    const total = sess.steps.reduce((a, s) => a + E.stepEstimate(s), 0);
-    const left = sess.steps.filter(s => !s.done).reduce((a, s) => a + E.stepEstimate(s), 0);
-    return { total, left, done: sess.steps.filter(s => s.done).length, count: sess.steps.length, current: sess.steps.find(s => !s.done) || null };
-  };
+
   E.lastSeenText = it => {
     if (!it || !it.doneAt) return '';
     const last = (it.attempts || []).slice(-1)[0];
     const k = last ? last.d : U.dayKey(new Date(it.doneAt));
     const n = U.diffDays(k, U.today());
-    return n <= 0 ? 'Seen today' : n === 1 ? 'Seen yesterday' : `Seen ${n} days ago`;
+    return n <= 0 ? 'Seen earlier today' : n === 1 ? 'Seen yesterday' : `Seen ${n} days ago`;
   };
 
   // ─────────────────────────────── Streak (one missed day a week is forgiven)
@@ -352,14 +285,13 @@
     let n = 0, grace = null;
     for (let i = 0; i < 2000; i++) {
       if (E.isActive(k)) n++;
-      else if (!E.isRestDay(k)) {
-        if (grace === null || U.diffDays(k, grace) >= 7) grace = k; // forgive one missed day per week
-        else break;
-      }
+      else if (grace === null || U.diffDays(k, grace) >= 7) grace = k; // forgive one missed day per week
+      else break;
       k = U.addDays(k, -1);
     }
     return n;
   };
+  E.doneToday = () => (st().days[U.today()] || { steps: 0 }).steps;
 
   // ─────────────────────────────── Rewards he sets himself
   E.milestones = () => {
@@ -396,40 +328,16 @@
   };
   E.lockedCount = () => Object.values(st().items).filter(it => it.locked).length;
 
-  // ─────────────────────────────── Plan: finish date and unit dates
-  E.capacity = k => (E.isRestDay(k) ? 0 : prof().dailyMinutes * 0.72);
-  let planCache = null, planV = -1;
-  E.plan = () => {
-    if (planCache && planV === E.version) return planCache;
-    const q = E.newQueue(); const today = U.today();
-    const doneToday = (st().sessions[today] || { steps: [] }).steps.filter(s => s.done && s.kind === 'new').reduce((a, s) => a + E.stepEstimate(s), 0);
-    let k = today, left = Math.max(0, E.capacity(k) - doneToday), guard = 0;
-    const unitSpan = {}; let total = 0;
-    for (const s of q) {
-      const est = E.stepEstimate(s); total += est;
-      while (left < est * 0.5 && guard++ < 8000) { k = U.addDays(k, 1); left = E.capacity(k); }
-      left -= est;
-      const loc = E.idx.loc[s.ref]; if (loc) { const sp = unitSpan[loc.unit.id] || (unitSpan[loc.unit.id] = { start: k, end: k }); sp.end = k; }
-    }
-    planCache = { eta: k, totalMin: total, count: q.length, unitSpan }; planV = E.version;
-    return planCache;
-  };
-  E.recentMinutesPerDay = () => {
-    let sum = 0; for (let i = 0; i < 14; i++) { const d = st().days[U.addDays(U.today(), -i)]; if (d) sum += d.minutes; }
-    return sum / 14;
-  };
-
   // ─────────────────────────────── Notes helpers
   E.hasNote = it => !!(it && ((it.note && it.note.trim()) || (it.key && it.key.trim())));
 
-  // ─────────────────────────────── Timer
+  // ─────────────────────────────── Timer (measures a solve, so outcomes can say how long it took)
   E.timerStart = ref => { const t = st().timer; if (t && t.ref === ref) { if (!t.running) { t.start = Date.now(); t.running = true; } return; } st().timer = { ref, start: Date.now(), acc: 0, running: true }; };
   E.timerToggle = () => { const t = st().timer; if (!t) return; if (t.running) { t.acc += Date.now() - t.start; t.running = false; } else { t.start = Date.now(); t.running = true; } };
   E.timerSeconds = ref => { const t = st().timer; if (!t || (ref && t.ref !== ref)) return 0; return (t.acc + (t.running ? Date.now() - t.start : 0)) / 1000; };
   E.timerStop = ref => { const sec = E.timerSeconds(ref); if (!ref || (st().timer && st().timer.ref === ref)) st().timer = null; return Math.round(sec / 60); };
 
-  // Day rollover bookkeeping
-  E.reconcile = () => { st().lastSeen = U.today(); const d = st().deferred || {}; Object.keys(d).forEach(r => { if (d[r] <= U.today()) delete d[r]; }); };
+  E.reconcile = () => { st().lastSeen = U.today(); };
 
   DQ.engine = E;
 })();

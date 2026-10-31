@@ -1,4 +1,4 @@
-/* Path: the whole syllabus, in teaching order, with planned dates. */
+/* Syllabus: the whole path, in teaching order. No dates: he sets the pace. */
 (function () {
   const DQ = window.DQ, U = DQ.U, S = DQ.store, E = DQ.engine, ui = DQ.ui, D = window.DQ_DATA;
   let query = '';
@@ -8,7 +8,7 @@
     const ref = entry.ref, it = S.peek(ref) || {}, done = E.isDone(ref);
     const req = E.isRequired(entry, unit);
     let meta;
-    if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; const n = E.videoParts(E.idOf(ref)); meta = `Lecture, ${Math.round(v.dur / 60)} min${n > 1 && !done && it.parts ? `, ${it.parts} of ${n} parts watched` : ''}`; }
+    if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; meta = `Lecture, ${Math.round(v.dur / 60)} min`; }
     else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${E.showDiff(ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] : 'Problem'}${E.isBlind75(p) ? ', Blind 75' : ''}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
     const o = it.outcome && E.outcomeMeta(it.outcome);
     return `<li><button class="prow ${done ? 'is-done' : ''} ${req ? '' : 'is-optional'}" data-act="open" data-ref="${ref}">
@@ -19,11 +19,11 @@
     </button></li>`;
   }
 
-  function unitBlock(u, plan, cur) {
-    const up = E.unitProgress(u), span = plan.unitSpan[u.id];
+  function unitBlock(u, cur) {
+    const up = E.unitProgress(u);
     const isOpen = open[u.id] !== undefined ? open[u.id] : u === cur;
     const ch = E.challengeOf(u);
-    const when = up.complete ? 'Done' : span ? (span.start === span.end ? U.fmtDay(span.start) : `${U.fmtDay(span.start)} to ${U.fmtDay(span.end)}`) : '';
+    const when = up.complete ? 'Done' : `${up.total - up.done} left`;
     return `<div class="unit t-acc ${up.complete ? 'is-complete' : ''} ${u === cur ? 'is-current' : ''}" data-open="${isOpen}" data-unit="${u.id}">
       <button class="unit-head" data-act="unit-toggle" aria-expanded="${isOpen}">
         <span class="unit-title">${U.esc(u.title)}</span>
@@ -64,20 +64,20 @@
 
   DQ.views.path = {
     render() {
-      const plan = E.plan(), a2z = E.a2zProgress(), cur = E.currentUnit();
+      const a2z = E.a2zProgress(), cur = E.currentUnit();
       return `<div class="page">
-        <header class="page-head"><h1>Path</h1>
-          <p class="sub">${a2z.done} of ${a2z.total} A2Z problems done. At ${S.state.profile.dailyMinutes} minutes a day you finish around ${U.fmtMonth(plan.eta)}.</p></header>
+        <header class="page-head"><h1>Syllabus</h1>
+          <p class="sub">Everything on the path, in order. <span class="num">${a2z.done}</span> of <span class="num">${a2z.total}</span> A2Z problems done, <span class="num">${E.remaining()}</span> steps left.</p></header>
         <div class="toolbar"><label class="search">${U.icon('magnifying-glass', 16)}<input class="input" data-search placeholder="Find a problem or lecture" value="${U.esc(query)}" aria-label="Search the path"></label></div>
         <div id="path-body">${query ? results() : E.idx.sections.map(sec => {
           const sp = E.sectionProgress(sec);
-          return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, plan, cur)).join('')}</section>`;
+          return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, cur)).join('')}</section>`;
         }).join('') + beyond()}</div>
       </div>`;
     },
     mount(root) {
       const s = root.querySelector('[data-search]');
-      if (s) s.addEventListener('input', U.debounce(() => { query = s.value.trim(); const plan = E.plan(), cur = E.currentUnit(); root.querySelector('#path-body').innerHTML = query ? results() : E.idx.sections.map(sec => { const sp = E.sectionProgress(sec); return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, plan, cur)).join('')}</section>`; }).join('') + beyond(); }, 180));
+      if (s) s.addEventListener('input', U.debounce(() => { query = s.value.trim(); const cur = E.currentUnit(); root.querySelector('#path-body').innerHTML = query ? results() : E.idx.sections.map(sec => { const sp = E.sectionProgress(sec); return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, cur)).join('')}</section>`; }).join('') + beyond(); }, 180));
       if (!DQ.views.path._scrolled) { DQ.views.path._scrolled = true; const c = root.querySelector('.unit.is-current'); if (c) setTimeout(() => c.scrollIntoView({ block: 'start' }), 30); }
     },
   };

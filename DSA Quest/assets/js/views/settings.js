@@ -1,41 +1,26 @@
 /* Settings: the few knobs that matter, plus backups. */
 (function () {
   const DQ = window.DQ, U = DQ.U, S = DQ.store, E = DQ.engine, ui = DQ.ui, D = window.DQ_DATA;
-  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const seg = (name, opts, cur) => `<div class="seg" role="radiogroup">${opts.map(([v, l]) => `<button role="radio" aria-checked="${String(cur) === String(v)}" data-act="set" data-k="${name}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const toggle = (k, label, sub, on) => `<label class="toggle-row"><span><b>${label}</b><span class="muted small">${sub}</span></span><input type="checkbox" class="toggle" data-toggle="${k}" ${on ? 'checked' : ''}></label>`;
 
   DQ.views.settings = {
     render() {
-      const p = S.state.profile, plan = E.plan(), fs = S.fileStatus();
+      const p = S.state.profile, fs = S.fileStatus();
       const online = DQ.sync.enabled;
       const savedAtText = () => new Date(DQ.sync.savedAt()).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-      const bits = D.sheet.find(t => t.key === 'bit').sections[0].items;
       return `<div class="page narrow">
         <header class="page-head"><h1>Settings</h1></header>
 
-        <section class="block"><h2>Daily session</h2>
-          <div class="set-row"><span><b>Time per day</b><span class="muted small">The session fills this. About a quarter goes to earlier problems coming back.</span></span>${seg('dailyMinutes', [[45, '45 min'], [60, '60 min'], [75, '75 min'], [90, '90 min'], [120, '2 h']], p.dailyMinutes)}</div>
-          <div class="set-row"><span><b>Rest days</b><span class="muted small">No session, and the streak is safe.</span></span><div class="seg">${DAYS.map((d, i) => `<button aria-pressed="${p.restDays.includes(i)}" data-act="rest" data-d="${i}">${d}</button>`).join('')}</div></div>
+        <section class="block"><h2>Path</h2>
           ${toggle('extras', "Babbar's extra problems", 'The problems Babbar solves in his lectures, beyond Striver A2Z.', p.extras)}
           ${toggle('bosses', 'Unit challenge', 'One unseen problem at the end of each unit, to check you own it. Hints stay closed for the first 25 minutes, like an interview.', p.bosses)}
           ${toggle('hideDifficulty', 'Hide difficulty until solved', "Like a real interview: you don't know if a problem is Easy or Hard until you've solved it.", p.hideDifficulty)}
-          <p class="muted small">With these settings you finish around <b>${U.fmtMonth(plan.eta)}</b>.</p>
         </section>
 
         <section class="block"><h2>Appearance</h2>
           <div class="set-row"><span><b>Theme</b></span>${seg('theme', [['system', 'System'], ['dark', 'Dark'], ['light', 'Light']], p.theme)}</div>
-        </section>
-
-        <section class="block"><h2>Time estimates</h2>
-          <p class="muted small">Minutes for a first attempt, including notes. Used for the session and the finish date.</p>
-          <div class="est-grid">${[['E', 'Easy'], ['M', 'Medium'], ['H', 'Hard'], ['T', 'Concept']].map(([k, l]) => `<label class="field"><span class="field-label">${l}</span><input class="input num" type="number" min="5" max="240" data-est="${k}" value="${p.estimates[k]}"></label>`).join('')}</div>
-        </section>
-
-        <section class="block"><h2>Imported progress</h2>
-          <p class="muted small">Your old tracker said Bit Manipulation 4 of 18 without saying which. Tick the ones you actually did.</p>
-          <ul class="checks">${bits.map(id => `<li><label class="check-row"><input type="checkbox" data-legacy="${id}" ${E.isDone('p:' + id) ? 'checked' : ''}><span>${U.esc(D.problems[id].t)}</span></label></li>`).join('')}</ul>
         </section>
 
         <section class="block"><h2>${online ? 'Saving' : 'Backups'}</h2>
@@ -57,30 +42,13 @@
       </div>`;
     },
     mount(root) {
-      root.querySelectorAll('[data-toggle]').forEach(inp => inp.addEventListener('change', () => { S.state.profile[inp.dataset.toggle] = inp.checked; delete S.state.sessions[U.today()]; S.commit(); }));
-      root.querySelectorAll('[data-est]').forEach(inp => inp.addEventListener('change', () => { const v = Number(inp.value); if (v > 0) { S.state.profile.estimates[inp.dataset.est] = v; S.commit(); } }));
-      root.querySelectorAll('[data-legacy]').forEach(inp => inp.addEventListener('change', () => {
-        const ref = 'p:' + inp.dataset.legacy;
-        if (inp.checked && !E.isDone(ref)) { const it = S.item(ref); it.status = 'done'; it.outcome = 'imported'; it.imported = true; it.doneAt = Date.now() - 864e5; }
-        else if (!inp.checked) E.undo(ref);
-        S.state.profile.legacyConfirmed = true; S.commit({ silent: true });
-      }));
+      root.querySelectorAll('[data-toggle]').forEach(inp => inp.addEventListener('change', () => { S.state.profile[inp.dataset.toggle] = inp.checked; S.commit(); }));
       const f = root.querySelector('#import-file');
       if (f) f.addEventListener('change', () => { const file = f.files[0]; if (!file) return; file.text().then(t => { try { S.importJSON(t); location.reload(); } catch (e) { ui.toast(U.esc(e.message)); } }); });
     },
   };
 
-  ui.on('set', el => {
-    const k = el.dataset.k, v = el.dataset.v;
-    S.state.profile[k] = k === 'theme' ? v : Number(v);
-    if (k === 'dailyMinutes') delete S.state.sessions[U.today()];
-    S.applyPrefs(); S.commit();
-  });
-  ui.on('rest', el => {
-    const d = Number(el.dataset.d), r = new Set(S.state.profile.restDays);
-    r.has(d) ? r.delete(d) : r.add(d); if (r.size >= 7) return;
-    S.state.profile.restDays = [...r].sort(); delete S.state.sessions[U.today()]; S.commit();
-  });
+  ui.on('set', el => { S.state.profile[el.dataset.k] = el.dataset.v; S.applyPrefs(); S.commit(); });
   ui.on('export', () => { S.exportJSON(); ui.toast('Backup downloaded.'); });
   ui.on('file-connect', async () => { try { await S.connectFile(); ui.render(); ui.toast('Auto-backup is on.'); } catch (e) { if (e.name !== 'AbortError') ui.toast('Could not connect the file.'); } });
   ui.on('file-resume', async () => { const ok = await S.resumeFile(); ui.toast(ok ? 'Auto-backup resumed.' : 'Permission was not given.'); ui.render(); });
@@ -95,11 +63,10 @@
       return `<div class="onboard"><div class="onboard-card">
         <span class="brand-mark lg">DQ</span>
         <h1>${S.migrated ? 'DSA Quest, simplified' : `Welcome, ${U.esc(p.name)}`}</h1>
-        <p class="muted">${S.migrated ? 'Same progress, calmer app.' : 'Babbar for lectures, Striver A2Z for practice, one session a day.'} ${n} problems from your old tracker are already done. Earlier problems come back inside your daily session, so there is no separate revision to remember.</p>
-        <div class="field"><span class="field-label">How long can you study on most days?</span>${seg('dailyMinutes', [[60, '60 min'], [75, '75 min'], [90, '90 min']], p.dailyMinutes)}</div>
-        <button class="btn btn-primary wide" data-act="ob-start">Start today's session</button>
+        <p class="muted">${S.migrated ? 'Same progress, one clear path.' : 'Babbar for lectures, Striver A2Z for practice, in one path: a lecture, then its problems, then the next.'} ${n} problems from your old tracker are already done. Go at your own pace; earlier problems come back on their own, in between new ones.</p>
+        <button class="btn btn-primary wide" data-act="ob-start">Start the path</button>
       </div></div>`;
     },
   };
-  ui.on('ob-start', () => { S.state.onboarded = true; delete S.state.sessions[U.today()]; S.commit({ silent: true }); if (ui.route() !== 'today') location.hash = '#/today'; else ui.render(); });
+  ui.on('ob-start', () => { S.state.onboarded = true; S.commit({ silent: true }); if (ui.route() !== 'today') location.hash = '#/today'; else ui.render(); });
 })();

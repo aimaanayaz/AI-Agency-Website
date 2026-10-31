@@ -13,19 +13,19 @@
     onboarded: false,
     profile: {
       name: 'Aimaan',
-      dailyMinutes: 75,
-      restDays: [],
-      extras: true,       // Babbar's extra lecture problems in the daily session
+      extras: true,       // Babbar's extra lecture problems on the path
       bosses: true,       // one unseen "challenge" problem at the end of each unit
       hideDifficulty: false, // hide Easy/Medium/Hard until a problem is solved
-      estimates: { E: 20, M: 40, H: 65, T: 10 },
       theme: 'system',
       ritual: { text: '', url: '' },
       dayStartHour: 4,
-      legacyConfirmed: false,
+      legacyConfirmed: true, // confirmed: the old tracker's 4 Bit Manipulation problems were the first four
     },
     items: {},
-    sessions: {},
+    skipped: [],   // "Skip for now": these wait behind the next item
+    log: [],       // recent steps, for "Just done"
+    lastKind: null,
+    lastAt: null,
     days: {},
     growth: [],
     rewards: [],
