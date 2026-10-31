@@ -210,7 +210,6 @@ body.is-onboarding .main { margin: 0; border: 0; border-radius: 0; background: v
 .nav-item[aria-current="page"] .ico, .nav-item:hover .ico { color: var(--text); }
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 10px; }
 .side-stat { display: flex; align-items: center; gap: 10px; padding: 3px 10px; font-size: 12.5px; color: var(--text-3); }
-.side-stat .num { font-family: var(--sans); font-size: inherit; letter-spacing: inherit; }
 .side-foot .nav-item { margin-top: 8px; }
 .sync-line[data-status="offline"], .sync-line[data-status="error"] { color: var(--text-2); }
 .boot { min-height: 70vh; display: grid; place-content: center; justify-items: center; gap: 14px; }
@@ -224,7 +223,7 @@ body.is-onboarding .main { margin: 0; border: 0; border-radius: 0; background: v
 .page-head .sub a { color: var(--text); }
 .block { padding: 28px 0 30px; border-top: 1px solid var(--line); }
 .block > h2 { font-size: 15px; letter-spacing: -0.012em; margin-bottom: 14px; }
-.block > p + p, .block > p + .btn-row, .block > p + .rw-form, .block > p + .est-grid, .block > p + .checks { margin-top: 12px; }
+.block > p + p, .block > p + .btn-row, .block > p + .rw-form, .block > p + .checks { margin-top: 12px; }
 .lede { font-size: 17px; line-height: 1.6; color: var(--text-2); max-width: 62ch; margin-bottom: 32px; letter-spacing: -0.01em; }
 .lede b { color: var(--text); font-weight: 600; }
 
@@ -355,8 +354,6 @@ input.toggle:checked::before { transform: translateX(14px); }
 /* ───────────── Today */
 .today { display: grid; grid-template-columns: minmax(340px, 44fr) minmax(0, 56fr); min-height: 100%; }
 .session { padding: 40px 28px 64px 40px; min-width: 0; }
-.session .page-head { margin-bottom: 0; }
-.session .page-head h1 { font-size: 28px; }
 .focus {
   position: sticky; top: 0; align-self: start; height: calc(100dvh - 2 * var(--inset) - 2px); overflow-y: auto;
   border-left: 1px solid var(--line); background: var(--bg-pane); border-radius: 0 11px 11px 0; min-width: 0;
@@ -365,13 +362,6 @@ input.toggle:checked::before { transform: translateX(14px); }
 .ritual { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-2); }
 .ritual .ico { color: var(--text-3); }
 .ritual a { text-decoration-color: var(--line-strong); }
-.note-line {
-  display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 8px 10px 12px; border-radius: 10px;
-  background: var(--surface-2); border: 1px solid var(--line); color: var(--text-2); font-size: 13px; line-height: 1.45;
-}
-.note-line > .ico { color: var(--text-3); }
-.note-line a { color: var(--text); }
-.note-line .icon-btn { margin-left: auto; width: 26px; height: 26px; }
 
 /* The path: unit header, then the line. A rail joins every step; it is indigo through what is done, up to "now". */
 .unit-hero { margin-bottom: 26px; }
@@ -679,7 +669,6 @@ input.toggle:checked::before { transform: translateX(14px); }
 .set-row b, .toggle-row b { font-weight: 500; }
 .toggle-row { cursor: pointer; }
 .set-row + p, .toggle-row + p { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
-.est-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .block.danger { padding-bottom: 0; }
 
 .onboard { min-height: 100dvh; display: grid; place-items: center; padding: 32px 20px; }
@@ -911,7 +900,7 @@ input.toggle:checked::before { transform: translateX(14px); }
   .nav-item { padding: 0 9px; }
   .nav-item span { display: none; }
   .nav-item[aria-current="page"] span { display: inline; }
-  .page-head h1, .session .page-head h1 { font-size: 24px; }
+  .page-head h1, .unit-hero h1 { font-size: 24px; }
   .outcome-list, [data-mode="recall"] .outcome-list { grid-template-columns: minmax(0, 1fr); }
   .unit-head { grid-template-columns: minmax(0, 1fr) 84px 16px; }
   .unit-when { display: none; }
@@ -921,7 +910,6 @@ input.toggle:checked::before { transform: translateX(14px); }
   .prow-meta { display: none; }
   .set-row, .toggle-row { flex-direction: column; align-items: flex-start; gap: 10px; }
   .toggle-row { flex-direction: row; align-items: center; }
-  .est-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .growth li { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title title" "then then" "now now" "date date"; }
   .growth li > .growth-recall { grid-row: 3; grid-column: 1 / -1; }
   .growth li > .ico { display: none; }

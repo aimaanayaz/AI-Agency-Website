@@ -72,7 +72,7 @@
   function instruction(ref, mode, it) {
     const last = it && (it.attempts || []).slice(-1)[0];
     const lastTxt = last ? `${(E.outcomeMeta(last.outcome) || {}).label || 'Done'}${last.mins ? ', ' + last.mins + ' min' : ''}` : '';
-    if (mode === 'solve') { const p = E.problem(E.idOf(ref)); return p && p.src === 'boss' ? "A problem you haven't seen, to check you really own this unit. No hints for the first 25 minutes." : 'Give it 20 honest minutes before you open any hint.'; }
+    if (mode === 'solve') { const p = E.problem(E.idOf(ref)); return p && p.src === 'boss' ? "A problem you haven't seen, to check you really own this unit. No hints for the first 25 minutes." : 'Try it on your own first. Open a hint only when you are truly stuck.'; }
     if (mode === 'resolve') return `${E.lastSeenText(it)}. Re-solve it from scratch.${it && it.aim === 'optimal' ? ' Go for the optimal approach this time.' : ''}${lastTxt ? ' Last time: ' + lastTxt + '.' : ''}`;
     if (mode === 'recall') return `${E.lastSeenText(it)}. Without opening it, say how you'd solve it: the pattern, the key idea and the complexity. Then check your note.`;
     if (mode === 'read') return 'A short concept. Read it once, then write the one idea you want to remember.';
