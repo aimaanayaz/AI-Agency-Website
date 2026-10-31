@@ -44,3 +44,6 @@ build_utf8.log
 
 # local dev server log
 dev-server.log
+
+# DSA Quest progress data (only if the server falls back to storing it inside the app folder)
+.dsa-quest-data/
