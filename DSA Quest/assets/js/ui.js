@@ -33,7 +33,7 @@
       <div class="side-foot">
         <div class="side-stat">${U.icon('fire', 16)}<span>${streak ? U.plural(streak, 'day') + ' in a row' : 'Start a streak today'}</span></div>
         <div class="side-stat">${U.icon('check-circle', 16)}<span><span class="num">${E.doneToday()}</span> done today</span></div>
-        ${DQ.sync.enabled ? `<div class="side-stat sync-line" id="sync-line">${ui.syncLine()}</div>` : ''}
+        ${DQ.sync.enabled ? `<div class="side-stat sync-line" id="sync-line" data-sync-line>${ui.syncLine()}</div>` : ''}
         <a class="nav-item" href="#/settings" ${r === 'settings' ? 'aria-current="page"' : ''}>${U.icon('gear-six')}<span>Settings</span></a>
       </div>`;
   };
@@ -44,9 +44,10 @@
     return label ? `${U.icon(s === 'offline' || s === 'error' ? 'cloud-slash' : 'cloud-check', 16)}<span>${label}</span>` : '';
   };
   DQ.sync.onStatus(() => {
-    const el = document.getElementById('sync-line'); if (!el) return;
-    el.innerHTML = ui.syncLine(); el.dataset.status = DQ.sync.status;
+    document.querySelectorAll('[data-sync-line]').forEach(el => { el.innerHTML = ui.syncLine(); el.dataset.status = DQ.sync.status; });
   });
+  // Phones and portrait tablets: bottom tabs, and a step opens in a bottom sheet instead of the side pane.
+  ui.compact = () => matchMedia('(max-width: 900px)').matches;
 
   // ───────────────────────── Small building blocks
   const DIFF = { E: 'Easy', M: 'Medium', H: 'Hard', T: 'Concept' };
@@ -184,7 +185,7 @@
   ui._revealed = {};
   ui.findStep = id => E.findStep(id);
   ui.recordFrom = (ref, outcome, stepOverride) => {
-    let step = stepOverride || (ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : null);
+    let step = stepOverride || (ui._sheetStep && ui._sheetStep.ref === ref ? ui._sheetStep : null) || (ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : null);
     if (!step) step = E.isSolved(ref) ? { ref, kind: 'again', mode: 'resolve' } : { ref, kind: 'new', mode: E.kindOf(ref) === 'theory' ? 'read' : 'solve' };
     const mins = E.timerStop(ref);
     const events = E.record(step, outcome, mins);
@@ -195,7 +196,8 @@
   ui.afterRecord = events => {
     ui._sel = null; ui._arrived = true;
     events.forEach(e => { if (e.type === 'unit' || e.type === 'reward') ui.logWin(e); });
-    if (ui._sheetRef) ui.refreshSheet();
+    // A path step done from the sheet (phone): close it and let the line move on. Browsing: show the updated item.
+    if (ui._sheetStep) ui.closeSheet(); else if (ui._sheetRef) ui.refreshSheet();
     ui.render();
     events.forEach((e, i) => setTimeout(() => ui.event(e), 250 + i * 200));
   };
@@ -220,19 +222,19 @@
     if (e.type === 'reward') ui.toast(`<b>You get to: ${U.esc(e.reward.text)}</b><span class="toast-sub">${U.esc(e.reward.label)}</span>`, 'good', 7000);
   };
 
-  // ───────────────────────── Sheet (item details outside the session)
-  ui.openSheet = ref => {
-    ui._sheetRef = ref; ui._ctxStep = null;
+  // ───────────────────────── Sheet: an item from the Syllabus or Notebook, or (on a phone) a step from the path
+  ui.openSheet = (ref, step = null) => {
+    ui._sheetRef = ref; ui._sheetStep = step; ui._ctxStep = step;
     const root = document.getElementById('sheet-root');
-    root.innerHTML = `<div class="sheet-backdrop" data-act="close-sheet"></div><aside class="sheet" role="dialog" aria-modal="true" aria-label="${U.esc(E.title(ref))}"><button class="icon-btn sheet-close" data-act="close-sheet" aria-label="Close">${U.icon('x', 18)}</button><div class="sheet-body">${ui.itemPanel(ref, null)}</div></aside>`;
+    root.innerHTML = `<div class="sheet-backdrop" data-act="close-sheet"></div><aside class="sheet" role="dialog" aria-modal="true" aria-label="${U.esc(E.title(ref))}"><button class="icon-btn sheet-close" data-act="close-sheet" aria-label="Close">${U.icon('x', 18)}</button><div class="sheet-body">${ui.itemPanel(ref, step)}</div></aside>`;
     requestAnimationFrame(() => requestAnimationFrame(() => root.dataset.open = 'true'));
     ui.bindFields(root);
   };
   ui.refreshSheet = () => {
     const body = document.querySelector('#sheet-root .sheet-body'); if (!body || !ui._sheetRef) return;
-    body.innerHTML = ui.itemPanel(ui._sheetRef, null); ui.bindFields(body);
+    body.innerHTML = ui.itemPanel(ui._sheetRef, ui._sheetStep || null); ui.bindFields(body);
   };
-  ui.closeSheet = () => { const root = document.getElementById('sheet-root'); root.dataset.open = 'false'; ui._sheetRef = null; setTimeout(() => { if (root.dataset.open !== 'true') root.innerHTML = ''; }, 360); };
+  ui.closeSheet = () => { const root = document.getElementById('sheet-root'); root.dataset.open = 'false'; ui._sheetRef = null; ui._sheetStep = null; setTimeout(() => { if (root.dataset.open !== 'true') root.innerHTML = ''; }, 360); };
   ui.on('close-sheet', ui.closeSheet);
   ui.on('open', el => ui.openSheet(el.dataset.ref));
 
@@ -270,11 +272,11 @@
   ui.on('read', el => ui.afterRecord(ui.recordFrom(el.dataset.ref, 'done')));
   ui.on('watched', el => {
     const ref = el.dataset.ref;
-    const step = ui._ctxStep && ui._ctxStep.ref === ref ? ui._ctxStep : { ref, kind: 'new', mode: 'watch' };
+    const step = (ui._sheetStep && ui._sheetStep.ref === ref && ui._sheetStep) || (ui._ctxStep && ui._ctxStep.ref === ref && ui._ctxStep) || { ref, kind: 'new', mode: 'watch' };
     ui.afterRecord(ui.recordFrom(ref, 'done', step));
   });
   ui.on('undo', el => { E.undo(el.dataset.ref); S.commit({ silent: true }); ui.refreshSheet(); ui.render(); });
-  ui.on('skip', el => { const step = ui.findStep(el.dataset.step); if (!step) return; E.skipStep(step); S.commit({ silent: true }); ui._sel = null; ui.render(); ui.toast(step.kind === 'again' ? 'It will come back a little later.' : 'Moved behind the next step.'); });
+  ui.on('skip', el => { const step = ui.findStep(el.dataset.step); if (!step) return; E.skipStep(step); S.commit({ silent: true }); ui._sel = null; if (ui._sheetStep) ui.closeSheet(); ui.render(); ui.toast(step.kind === 'again' ? 'It will come back a little later.' : 'Moved behind the next step.'); });
   ui.on('ai-tutor', async el => {
     const p = E.problem(E.idOf(el.dataset.ref)); const url = p.lc ? U.lcUrl(p.lc) : p.gfg || '';
     const text = `You are my DSA tutor. Problem: "${p.t}"${url ? ` (${url})` : ''}. I code in Java.\n\nRules:\n- Do not give me code or the full solution.\n- Ask me one guiding question at a time so I find the approach myself.\n- If I'm still stuck after three questions, give one small hint about the key idea only.\n- When I propose an approach, ask me for its time and space complexity and one edge case.\n\nMy current thinking: `;
@@ -286,7 +288,7 @@
   ui.rerenderPanel = panelInner => {
     if (!panelInner) return;
     const ref = panelInner.dataset.ref; const inSheet = !!panelInner.closest('#sheet-root');
-    const step = inSheet ? null : ui._ctxStep;
+    const step = inSheet ? ui._sheetStep : ui._ctxStep;
     const wrap = document.createElement('div'); wrap.innerHTML = ui.itemPanel(ref, step && step.ref === ref ? step : null);
     const fresh = wrap.firstElementChild; panelInner.replaceWith(fresh); ui.bindFields(fresh.parentNode);
   };

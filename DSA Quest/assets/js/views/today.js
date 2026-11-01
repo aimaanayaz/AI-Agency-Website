@@ -42,7 +42,27 @@
       ${nodeDot(kind, s)}
       <span class="node-body"><span class="node-title">${U.esc(E.title(s.ref))}</span><span class="node-meta">${meta}</span></span>
       ${thumb(s, kind === 'now')}
-    </button></li>`;
+    </button>${kind === 'now' ? nowActions(s) : ''}</li>`;
+  }
+
+  // Phone only (hidden on desktop, where the side panel holds these): the current step's actions, within thumb reach.
+  function nowActions(s) {
+    const p = !E.isVideo(s.ref) && E.problem(E.idOf(s.ref));
+    const open = (label, cls = 'btn') => `<button class="${cls}" data-act="open-step" data-step="${s.id}">${label}</button>`;
+    let primary = '';
+    if (s.mode === 'watch') primary = `<a class="btn btn-primary" href="${U.ytUrl(E.idOf(s.ref))}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${s.ref}">${U.icon('play', 16)}<span>Watch</span></a>`;
+    else if (s.mode === 'read') primary = `<a class="btn btn-primary" href="${p.gfg || U.google(p.t + ' java explained')}" target="_blank" rel="noopener">${U.icon('book-open', 16)}<span>Read about it</span></a>`;
+    else if (s.mode !== 'recall') { const l = E.practiceLink(p); primary = `<a class="btn btn-primary" href="${l.url}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${s.ref}">${U.icon('arrow-square-out', 16)}<span>Open on ${l.label}</span></a>`; }
+    const second = s.mode === 'recall' ? open('Recall it', 'btn btn-primary') : s.mode === 'watch' || s.mode === 'read' ? open('Notes and done') : open('How did it go?');
+    return `<div class="node-actions">${primary}${second}</div>`;
+  }
+
+  // Phone: a step opens in a bottom sheet; the path stays where it is behind it.
+  function openStep(id) {
+    const step = E.line(12).find(x => x.id === id);
+    if (step) return ui.openSheet(step.ref, step);
+    const past = E.recent(2).find(x => 'log:' + x.at === id);
+    if (past) ui.openSheet(past.ref, null);
   }
 
   // The line: last two done, the current step, then what comes next, with a divider where a new unit starts.
@@ -90,6 +110,7 @@
             <p class="sub"><span class="num">${up.done}/${up.total}</span> done in this unit, unit <span class="num">${unit.index + 1}</span> of <span class="num">${E.idx.units.length}</span></p>
             <div class="unit-bar" role="img" aria-label="${pct}% of this unit done"><span data-to="${pct}" style="width:${from}%"></span></div>
             ${unit.desc ? `<p class="unit-lede">${U.esc(unit.desc)}</p>` : ''}
+            <p class="phone-stats"><span>${U.icon('fire', 15)}<span>${E.streak() ? `<span class="num">${E.streak()}</span> ${E.streak() === 1 ? 'day' : 'days'} in a row` : 'Start a streak today'}</span></span><span>${U.icon('check-circle', 15)}<span><span class="num">${E.doneToday()}</span> done today</span></span>${DQ.sync.enabled ? `<span class="sync-line" data-sync-line>${ui.syncLine()}</span>` : ''}</p>
             ${ritual}
             ${wins.length ? `<ul class="wins">${wins.map(w => `<li>${U.icon(w.type === 'reward' ? 'gift' : 'flag-pennant', 16)}<span><b>${U.esc(w.title)}</b><span>${U.esc(w.sub)}</span></span></li>`).join('')}</ul>` : ''}
           </header>
@@ -110,5 +131,9 @@
     },
   };
 
-  ui.on('select-step', el => { ui._sel = ui._sel === el.dataset.step ? null : el.dataset.step; ui.render(); });
+  ui.on('select-step', el => {
+    if (ui.compact()) return openStep(el.dataset.step);
+    ui._sel = ui._sel === el.dataset.step ? null : el.dataset.step; ui.render();
+  });
+  ui.on('open-step', el => openStep(el.dataset.step));
 })();
