@@ -8,7 +8,7 @@
     const ref = entry.ref, it = S.peek(ref) || {}, done = E.isDone(ref);
     const req = E.isRequired(entry, unit);
     let meta;
-    if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; meta = `Lecture, ${Math.round(v.dur / 60)} min`; }
+    if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; meta = `Lecture, ${Math.round(v.dur / 60)} min${E.isEmbedded(ref, unit) ? ', the solution to the problems above' : ''}`; }
     else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${E.showDiff(ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] : 'Problem'}${E.isBlind75(p) ? ', Blind 75' : ''}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
     const o = it.outcome && E.outcomeMeta(it.outcome);
     return `<li><button class="prow ${done ? 'is-done' : ''} ${req ? '' : 'is-optional'}" data-act="open" data-ref="${ref}">
@@ -33,7 +33,7 @@
       </button>
       <div class="t-acc-panel"><div class="t-acc-panel-inner"><div class="unit-body">
         ${u.desc ? `<p class="unit-desc">${U.esc(u.desc)}</p>` : ''}
-        ${u.lessons.map(l => `<div class="lesson"><h4>${U.esc(l.title)}</h4><ul class="prows">${l.items.map(i => itemRow(i, u)).join('')}</ul></div>`).join('')}
+        ${u.lessons.map(l => `<div class="lesson"><h4>${U.esc(l.title)}</h4><ul class="prows">${E.orderedItems(l).map(i => itemRow(i, u)).join('')}</ul></div>`).join('')}
         ${u.boss.length ? `<div class="lesson"><h4>Challenge problems</h4><ul class="prows">${u.boss.map((b, i) => itemRow({ ref: b, optional: !(ch && i === 0) }, u)).join('')}</ul></div>` : ''}
         ${u.guide && u.guide.keys ? `<div class="guide"><h4>Remember from this unit</h4><ul>${u.guide.keys.map(k => `<li>${U.esc(k)}</li>`).join('')}</ul>${u.guide.traps ? `<h4>Common traps</h4><ul>${u.guide.traps.map(k => `<li>${U.esc(k)}</li>`).join('')}</ul>` : ''}</div>` : ''}
       </div></div></div>

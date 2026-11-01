@@ -43,8 +43,28 @@
     [/trie/i, 'u-trie'], [/kmp|z-function|rabin|string/i, 'u-str2'], [/linked list|\bll\b/i, 'u-ll3'], [/backtrack|recursion/i, 'u-bt'],
     [/bit/i, 'u-bits'], [/binary search/i, 'u-bs2'], [/sort/i, 'u-sort'], [/array|matrix/i, 'u-arr3'],
   ];
+  // Order that research supports: a lecture that introduces a topic is watched first (worked examples help when
+  // something is new), then its problems are practice. A lecture where Babbar solves a specific problem comes after
+  // you try that problem yourself (trying first, even failing, makes the solution stick).
+  const STOP = new Set('lecture problem problems series day part video check the and or of in to a an is not find leetcode coding solving solve using with from for all ll linked list lists array arrays string strings stack stacks queue queues number numbers element elements warm up one given return count based approach'.split(' '));
+  const stem = w => (w.length > 4 && w.endsWith('s') ? w.slice(0, -1) : w);
+  const words = t => String(t).toLowerCase().replace(/^lecture\s*\d+\s*:\s*/, '').replace(/^[a-z]+\s*-?\s*\d+\.\s*/, '')
+    .replace(/·.*$/, '').replace(/\(.*?\)/g, ' ').replace(/[^a-z0-9 ]+/g, ' ')
+    .split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w) && !/^\d+$/.test(w)).map(stem);
+  const INTRO = /\b(intro|introduction|in 1 video|in one video|basics|all about|patterns?|implement|disjoint set)\b/i;
+  const TEACHES = /^(implement|introduction)\b|\(theory\)/i; // a lecture followed by these is teaching a structure, not solving a puzzle
+  const FIRST = /^(l|g|dp)\s*-?\s*1\.|\bday[\s-]*1(?!\d)/i;
+  function solvesOnScreen(lectureTitle, p) {
+    if (!p || p.d === 'T' || INTRO.test(lectureTitle) || FIRST.test(lectureTitle) || TEACHES.test(p.t)) return false;
+    if (p.src === 'babbar') return true; // the problems Babbar solves in his lectures
+    const a = new Set(words(lectureTitle)), b = words(p.t);
+    if (!a.size || !b.length) return false;
+    const overlap = b.filter(w => a.has(w)).length;
+    return overlap >= 1 && overlap / Math.min(a.size, b.length) >= 0.5;
+  }
+
   E.buildIndex = () => {
-    const idx = { sections: [], units: [], unitById: {}, lessons: [], loc: {}, lectureFor: {}, newLectures: [] };
+    const idx = { sections: [], units: [], unitById: {}, lessons: [], loc: {}, lectureFor: {}, newLectures: [], solutionFor: {}, walkOf: {} };
     const used = new Set();
     D.journey.forEach(s => s.units.forEach(u => u.lessons.forEach(l => l.items.forEach(r => used.add(r.replace(/\?$/, ''))))));
     const fresh = {};
@@ -71,6 +91,22 @@
             else if (lastBabbar && !idx.lectureFor[E.idOf(ref)]) idx.lectureFor[E.idOf(ref)] = lastBabbar;
           });
           unit.lessons.push(lesson); idx.lessons.push(lesson);
+        });
+        // Which problems each lecture solves on screen. Those are tried first; the lecture becomes their solution.
+        // A lecture that teaches a structure (followed by "Implement…") or covers more than three problems is an overview: watched first.
+        unit.lessons.forEach(lesson => {
+          const groups = []; let g = null;
+          lesson.items.forEach(it => {
+            if (E.isVideo(it.ref)) { g = { lec: it.optional ? null : it.ref, probs: [] }; groups.push(g); }
+            else if (g && !it.optional) g.probs.push(it.ref);
+          });
+          groups.forEach(({ lec, probs }) => {
+            if (!lec || probs.some(r => P[E.idOf(r)] && TEACHES.test(P[E.idOf(r)].t))) return;
+            const solved = probs.filter(r => solvesOnScreen(E.title(lec), P[E.idOf(r)]));
+            if (!solved.length || solved.length > 3) return;
+            solved.forEach(r => { idx.solutionFor[r] = lec; });
+            idx.walkOf[lec] = solved;
+          });
         });
         unit.boss.forEach((ref, i) => { idx.loc[ref] = { unit, lesson: null, boss: true, bossIndex: i }; });
         sec.units.push(unit); idx.units.push(unit); idx.unitById[u.id] = unit;
@@ -186,6 +222,7 @@
         }
       }
       if (first) { it.status = 'done'; it.doneAt = Date.now(); it.firstOutcome = outcome; if (m) it.firstMins = m; }
+      if (first && E.idx.loc[ref]) settleLecture(E.idx.solutionFor[ref], E.idx.loc[ref].unit); // its solution lecture is now watched
       it.outcome = outcome;
       if (m) it.bestMins = it.bestMins ? Math.min(it.bestMins, m) : m;
       it.attempts = (it.attempts || []).concat([{ d: U.today(), kind: first ? 'first' : step.mode, outcome, mins: m }]);
@@ -226,13 +263,39 @@
   };
   const againStep = (ref, it) => ({ id: 'again:' + ref, ref, kind: 'again', mode: it.mode === 'recall' ? 'recall' : 'resolve', aim: it.aim || null });
 
-  // Everything new that is left, in teaching order. "Skip for now" moves an item behind the next one.
+  // A lecture that solves specific problems is "embedded": its problems carry it as their solution, so it never
+  // needs a row of its own and counts as watched once those problems are done.
+  const solvedOnScreen = (v, unit) => (E.idx.walkOf[v] || []).filter(r => E.isRequired({ ref: r }, unit));
+  E.isEmbedded = (v, unit) => solvedOnScreen(v, unit).length > 0;
+  E.solutionOf = ref => { const v = E.idx.solutionFor[ref], loc = E.idx.loc[ref]; return v && loc && E.isEmbedded(v, loc.unit) ? v : null; };
+  const settleLecture = (v, unit) => {
+    if (!v || E.isDone(v) || !E.isEmbedded(v, unit) || !solvedOnScreen(v, unit).every(E.isDone)) return;
+    const it = S.item(v); it.status = 'done'; it.doneAt = Date.now(); it.viaProblems = true;
+  };
+  // Items of a lesson in learning order: problems a lecture solves come before it, practice problems after it.
+  E.orderedItems = lesson => {
+    const items = lesson.items, out = [];
+    for (let i = 0; i < items.length;) {
+      const it = items[i];
+      if (E.isVideo(it.ref) && E.idx.walkOf[it.ref]) {
+        const tried = [], practice = []; let j = i + 1;
+        for (; j < items.length && !E.isVideo(items[j].ref); j++) (E.idx.solutionFor[items[j].ref] === it.ref ? tried : practice).push(items[j]);
+        out.push(...tried, it, ...practice); i = j;
+      } else { out.push(it); i++; }
+    }
+    return out;
+  };
+
+  // Everything new that is left, in learning order. "Skip for now" moves an item behind the next one.
   E.newQueue = () => {
     const out = [];
     E.idx.units.forEach(u => {
-      u.lessons.forEach(l => l.items.forEach(i => {
+      u.lessons.forEach(l => E.orderedItems(l).forEach(i => {
         if (!E.isRequired(i, u) || E.isDone(i.ref)) return;
-        out.push({ id: 'new:' + i.ref, ref: i.ref, kind: 'new', mode: E.isVideo(i.ref) ? 'watch' : P[E.idOf(i.ref)].d === 'T' ? 'read' : 'solve' });
+        if (E.isVideo(i.ref) && E.isEmbedded(i.ref, u)) return;
+        const step = { id: 'new:' + i.ref, ref: i.ref, kind: 'new', mode: E.isVideo(i.ref) ? 'watch' : P[E.idOf(i.ref)].d === 'T' ? 'read' : 'solve' };
+        const sol = !E.isVideo(i.ref) && E.solutionOf(i.ref); if (sol) step.solution = sol;
+        out.push(step);
       }));
       const ch = E.challengeOf(u); if (ch && !E.isDone(ch)) out.push({ id: 'new:' + ch, ref: ch, kind: 'new', mode: 'solve', challenge: true });
     });
@@ -337,7 +400,11 @@
   E.timerSeconds = ref => { const t = st().timer; if (!t || (ref && t.ref !== ref)) return 0; return (t.acc + (t.running ? Date.now() - t.start : 0)) / 1000; };
   E.timerStop = ref => { const sec = E.timerSeconds(ref); if (!ref || (st().timer && st().timer.ref === ref)) st().timer = null; return Math.round(sec / 60); };
 
-  E.reconcile = () => { st().lastSeen = U.today(); };
+  // On start: a solution lecture whose problems were all done earlier (or imported) counts as watched.
+  E.reconcile = () => {
+    st().lastSeen = U.today();
+    Object.keys(E.idx.walkOf).forEach(v => { const loc = E.idx.loc[v]; if (loc) settleLecture(v, loc.unit); });
+  };
 
   DQ.engine = E;
 })();

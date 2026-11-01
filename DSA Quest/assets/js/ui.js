@@ -73,11 +73,27 @@
   function instruction(ref, mode, it) {
     const last = it && (it.attempts || []).slice(-1)[0];
     const lastTxt = last ? `${(E.outcomeMeta(last.outcome) || {}).label || 'Done'}${last.mins ? ', ' + last.mins + ' min' : ''}` : '';
-    if (mode === 'solve') { const p = E.problem(E.idOf(ref)); return p && p.src === 'boss' ? "A problem you haven't seen, to check you really own this unit. No hints for the first 25 minutes." : 'Try it on your own first. Open a hint only when you are truly stuck.'; }
+    if (mode === 'solve') {
+      const p = E.problem(E.idOf(ref)), sol = E.solutionOf(ref);
+      if (p && p.src === 'boss') return "A problem you haven't seen, to check you really own this unit. No hints for the first 25 minutes.";
+      if (sol) return `${ui.lectureName(sol)} solves this. Try it on your own first; when you're done or stuck, watch the solution below, then pick how it went.`;
+      return 'Try it on your own first. Open a hint only when you are truly stuck.';
+    }
     if (mode === 'resolve') return `${E.lastSeenText(it)}. Re-solve it from scratch.${it && it.aim === 'optimal' ? ' Go for the optimal approach this time.' : ''}${lastTxt ? ' Last time: ' + lastTxt + '.' : ''}`;
     if (mode === 'recall') return `${E.lastSeenText(it)}. Without opening it, say how you'd solve it: the pattern, the key idea and the complexity. Then check your note.`;
     if (mode === 'read') return 'A short concept. Read it once, then write the one idea you want to remember.';
     return '';
+  }
+
+  // "Lecture 60" for Babbar, the video title for Striver.
+  ui.lectureName = vref => { const v = E.video(E.idOf(vref)) || {}; return v.lec ? `Babbar's Lecture ${v.lec}` : `Striver's video "${String(v.t || '').replace(/^[A-Za-z]+\s*-?\s*\d+\.\s*/, '')}"`; };
+  // The lecture that solves this problem, offered after the attempt (trying first makes the solution stick).
+  function solutionCard(vref) {
+    const id = E.idOf(vref), v = E.video(id) || {};
+    return `<a class="solution" href="${U.ytUrl(id)}" target="_blank" rel="noopener">
+      <span class="node-thumb"><img src="https://i.ytimg.com/vi/${id}/mqdefault.jpg" alt="" loading="lazy"></span>
+      <span class="solution-text"><b>The solution: ${U.esc(ui.lectureName(vref))}</b><span>${U.esc(String(v.t || '').replace(/^Lecture \d+:\s*/, '').replace(/\s*·.*$/, ''))}${v.dur ? `, <span class="num">${Math.round(v.dur / 60)}</span> min` : ''}. Watch it after you try.</span></span>
+      ${U.icon('arrow-square-out', 16)}</a>`;
   }
 
   // A unit challenge is a small mock interview: hints stay closed for the first 25 minutes on the timer.
@@ -139,7 +155,7 @@
         <header class="panel-head"><h2>${U.esc(v.t)}</h2>
           <div class="meta">${v.src === 'babbar' ? '<span class="chip">Babbar, Java</span>' : '<span class="chip">Striver</span>'}${v.dur ? `<span class="muted"><span class="num">${Math.round(v.dur / 60)}</span> min</span>` : ''}</div></header>
         <a class="video" href="${U.ytUrl(id)}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}"><img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy"><span class="video-play">${U.icon('play', 22)}</span></a>
-        <p class="instruction">Watch at your own speed and pause to write the code yourself before Babbar does. Mark it watched whenever you finish, in one go or over a few sittings.</p>
+        <p class="instruction">${E.idx.walkOf[ref] && E.isEmbedded(ref, (E.idx.loc[ref] || {}).unit) ? 'This is the solution to the problems before it. Watch it after you have tried them.' : 'This one introduces the idea, so it comes before the problems. Watch at your own speed and code along; the problems after it are your practice.'} Mark it watched whenever you finish, in one go or over a few sittings.</p>
         ${chapters.length ? `<div class="chapters">${chapters.map(([t, l]) => `<a href="${U.ytUrl(id, t)}" target="_blank" rel="noopener"><span class="num">${U.fmtClock(t)}</span>${U.esc(l)}</a>`).join('')}</div>` : ''}
         ${notesBlock(ref, 'watch', it)}
         <div class="panel-actions">
@@ -173,6 +189,7 @@
       ${mode !== 'recall' ? `<div class="panel-actions">
         ${p.d === 'T' ? `<a class="btn btn-primary" href="${p.gfg || U.google(p.t + ' java explained')}" target="_blank" rel="noopener">${U.icon('book-open', 16)}<span>Read about it</span></a>` :`<a class="btn btn-primary" href="${link.url}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}">${U.icon('arrow-square-out', 16)}<span>Open on ${link.label}</span></a>${timer}`}
       </div>` : ''}
+      ${mode === 'solve' && E.solutionOf(ref) ? solutionCard(E.solutionOf(ref)) : ''}
       ${p.d !== 'T' && !(mode === 'recall' && !ui._revealed[ref]) ? helpBlock(ref, p, mode) : ''}
       ${notesBlock(ref, mode, it)}
       ${outcome}

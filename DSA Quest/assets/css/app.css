@@ -480,6 +480,14 @@ input.toggle:checked::before { transform: translateX(14px); }
 .pattern-slot:empty { display: none; }
 .pattern-box { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); }
 
+/* Try first, then the lecture that solves it. */
+.solution { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 14px 10px 10px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); text-decoration: none; transition: border-color var(--duration-quick) var(--ease-out), background-color var(--duration-quick) var(--ease-out); }
+.solution:hover { border-color: var(--line-strong); background: var(--surface-3); }
+.solution .node-thumb { width: 96px; }
+.solution-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.solution-text b { font-weight: 500; }
+.solution-text > span { font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+.solution > .ico { color: var(--text-3); }
 .notes { display: flex; flex-direction: column; gap: 14px; }
 
 .outcome h3, .history h3 { font-size: 13px; color: var(--text-2); margin-bottom: 10px; letter-spacing: 0; }

@@ -15,10 +15,10 @@
     if (s.kind === 'again') return `Revisit, ${U.esc(E.lastSeenText(it).toLowerCase())}, ${s.mode === 'recall' ? 'quick recall' : 're-solve'}`;
     if (s.mode === 'read') return 'Concept';
     const diff = E.showDiff(s.ref) ? DIFF[p.d] || '' : 'Problem';
-    return `${diff}${E.isBlind75(p) ? ', Blind 75' : ''}${s.challenge || p.src === 'boss' ? ', unit challenge' : ''}`;
+    return `${diff}${E.isBlind75(p) ? ', Blind 75' : ''}${s.challenge || p.src === 'boss' ? ', unit challenge' : ''}${s.solution ? `, try it, then ${(E.video(E.idOf(s.solution)) || {}).lec ? "Babbar's" : "Striver's"} solution` : ''}`;
   }
 
-  const thumb = (s, big) => (s.mode === 'watch' ? `<span class="node-thumb${big ? ' is-big' : ''}"><img src="https://i.ytimg.com/vi/${E.idOf(s.ref)}/mqdefault.jpg" alt="" loading="lazy"></span>` : '');
+  const thumb = (s, big) => { const vid = s.mode === 'watch' ? E.idOf(s.ref) : s.solution ? E.idOf(s.solution) : null; return vid ? `<span class="node-thumb${big ? ' is-big' : ''}${s.solution ? ' is-solution' : ''}"><img src="https://i.ytimg.com/vi/${vid}/mqdefault.jpg" alt="" loading="lazy"></span>` : ''; };
 
   function nodeDot(kind, s) {
     if (kind === 'now') return '<span class="node-dot is-now" aria-hidden="true"></span>';
