@@ -6,10 +6,10 @@
 
   function itemRow(entry, unit, extra) {
     const ref = entry.ref, it = S.peek(ref) || {}, done = E.isDone(ref);
-    const req = E.isRequired(entry, unit);
+    const req = entry.challenge || E.isRequired(entry, unit);
     let meta;
     if (E.isVideo(ref)) { const v = E.video(E.idOf(ref)) || { dur: 0 }; meta = `Lecture, ${Math.round(v.dur / 60)} min${E.isEmbedded(ref, unit) ? ', the solution to the problems above' : ''}`; }
-    else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${E.showDiff(ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] : 'Problem'}${E.isBlind75(p) ? ', Blind 75' : ''}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
+    else { const p = E.problem(E.idOf(ref)); meta = p.d === 'T' ? 'Concept' : `${E.showDiff(ref) ? { E: 'Easy', M: 'Medium', H: 'Hard' }[p.d] : 'Problem'}${E.isBlind75(p) ? ', Blind 75' : ''}${entry.challenge ? ', unit challenge' : ''}${ui.srcLabel(p) ? ', ' + ui.srcLabel(p).replace(/^\w/, c => c.toLowerCase()) : ''}`; }
     const o = it.outcome && E.outcomeMeta(it.outcome);
     return `<li><button class="prow ${done ? 'is-done' : ''} ${req ? '' : 'is-optional'}" data-act="open" data-ref="${ref}">
       ${ui.dot(it.outcome, done)}
@@ -19,11 +19,18 @@
     </button></li>`;
   }
 
+  // A section he already knows has nothing on the path, so its units count every problem, as extra practice.
+  function extraProgress(u) {
+    const refs = u.lessons.flatMap(l => l.items.filter(i => !i.optional && !E.isVideo(i.ref)).map(i => i.ref)).concat(u.boss);
+    const done = refs.filter(E.isDone).length;
+    return { done, total: refs.length, pct: refs.length ? done / refs.length : 1, complete: done === refs.length };
+  }
+
   function unitBlock(u, cur) {
-    const up = E.unitProgress(u);
+    const known = E.isKnown(u), up = known ? extraProgress(u) : E.unitProgress(u);
     const isOpen = open[u.id] !== undefined ? open[u.id] : u === cur;
     const ch = E.challengeOf(u);
-    const when = up.complete ? 'Done' : `${up.total - up.done} left`;
+    const when = known && !up.complete ? 'Extra practice' : up.complete ? 'Done' : `${up.total - up.done} left`;
     return `<div class="unit t-acc ${up.complete ? 'is-complete' : ''} ${u === cur ? 'is-current' : ''}" data-open="${isOpen}" data-unit="${u.id}">
       <button class="unit-head" data-act="unit-toggle" aria-expanded="${isOpen}">
         <span class="unit-title">${U.esc(u.title)}</span>
@@ -34,7 +41,7 @@
       <div class="t-acc-panel"><div class="t-acc-panel-inner"><div class="unit-body">
         ${u.desc ? `<p class="unit-desc">${U.esc(u.desc)}</p>` : ''}
         ${u.lessons.map(l => `<div class="lesson"><h4>${U.esc(l.title)}</h4><ul class="prows">${E.orderedItems(l).map(i => itemRow(i, u)).join('')}</ul></div>`).join('')}
-        ${u.boss.length ? `<div class="lesson"><h4>Challenge problems</h4><ul class="prows">${u.boss.map((b, i) => itemRow({ ref: b, optional: !(ch && i === 0) }, u)).join('')}</ul></div>` : ''}
+        ${u.boss.length ? `<div class="lesson"><h4>Challenge problems</h4><ul class="prows">${u.boss.map(b => itemRow({ ref: b, challenge: b === ch }, u)).join('')}</ul></div>` : ''}
         ${u.guide && u.guide.keys ? `<div class="guide"><h4>Remember from this unit</h4><ul>${u.guide.keys.map(k => `<li>${U.esc(k)}</li>`).join('')}</ul>${u.guide.traps ? `<h4>Common traps</h4><ul>${u.guide.traps.map(k => `<li>${U.esc(k)}</li>`).join('')}</ul>` : ''}</div>` : ''}
       </div></div></div>
     </div>`;
@@ -62,22 +69,28 @@
     return out.length ? `<ul class="prows results">${out.slice(0, 80).map(([i, u]) => itemRow(i, u, `<span class="muted"> in ${U.esc(u.title)}</span>`)).join('')}</ul>` : `<p class="empty">Nothing matches "${U.esc(query)}".</p>`;
   }
 
+  function sections() {
+    const cur = E.currentUnit();
+    return E.idx.sections.map(sec => {
+      const sp = E.sectionProgress(sec), known = sec.index < E.startIndex();
+      const count = known ? '<span class="muted">You know this: extra practice</span>' : sp.total ? `<span class="muted num">${sp.done}/${sp.total}</span>` : '';
+      return `<section class="sec"><h2>${U.esc(sec.title)}${count}</h2>${sec.units.map(u => unitBlock(u, cur)).join('')}</section>`;
+    }).join('') + beyond();
+  }
+
   DQ.views.path = {
     render() {
-      const a2z = E.a2zProgress(), cur = E.currentUnit();
+      const start = E.idx.sections[E.startIndex()];
       return `<div class="page">
         <header class="page-head"><h1>Syllabus</h1>
-          <p class="sub">Everything on the path, in order. Essentials: <span class="num">${E.coreCount().done}</span> of <span class="num">${E.coreCount().total}</span> done. Dimmed rows are extra practice, which comes after the essentials (<span class="num">${E.extraLeft()}</span> left).</p></header>
+          <p class="sub">Everything on the path, in order${start.index ? `, starting from <b>${U.esc(start.title)}</b>` : ''}. Essentials: <span class="num">${E.coreCount().done}</span> of <span class="num">${E.coreCount().total}</span> done. Dimmed rows are extra practice, which comes after the essentials (<span class="num">${E.extraLeft()}</span> left).</p></header>
         <div class="toolbar"><label class="search">${U.icon('magnifying-glass', 16)}<input class="input" data-search placeholder="Find a problem or lecture" value="${U.esc(query)}" aria-label="Search the path"></label></div>
-        <div id="path-body">${query ? results() : E.idx.sections.map(sec => {
-          const sp = E.sectionProgress(sec);
-          return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, cur)).join('')}</section>`;
-        }).join('') + beyond()}</div>
+        <div id="path-body">${query ? results() : sections()}</div>
       </div>`;
     },
     mount(root) {
       const s = root.querySelector('[data-search]');
-      if (s) s.addEventListener('input', U.debounce(() => { query = s.value.trim(); const cur = E.currentUnit(); root.querySelector('#path-body').innerHTML = query ? results() : E.idx.sections.map(sec => { const sp = E.sectionProgress(sec); return `<section class="sec"><h2>${U.esc(sec.title)}<span class="muted num">${sp.done}/${sp.total}</span></h2>${sec.units.map(u => unitBlock(u, cur)).join('')}</section>`; }).join('') + beyond(); }, 180));
+      if (s) s.addEventListener('input', U.debounce(() => { query = s.value.trim(); root.querySelector('#path-body').innerHTML = query ? results() : sections(); }, 180));
       if (!DQ.views.path._scrolled) { DQ.views.path._scrolled = true; const c = root.querySelector('.unit.is-current'); if (c) setTimeout(() => c.scrollIntoView({ block: 'start' }), 30); }
     },
   };

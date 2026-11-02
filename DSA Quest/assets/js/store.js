@@ -14,6 +14,7 @@
     profile: {
       name: 'Aimaan',
       scope: 'core',      // essentials first ('core'), or every problem in teaching order ('all')
+      startAt: 's4',      // the section the path starts from; he knows the ones before it (chose Recursion, 2 Nov 2026)
       bosses: true,       // one unseen "challenge" problem at the end of each unit
       hideDifficulty: false, // hide Easy/Medium/Hard until a problem is solved
       theme: 'system',

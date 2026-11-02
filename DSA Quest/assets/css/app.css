@@ -271,6 +271,7 @@ label.btn { position: relative; }
 .textarea { height: auto; min-height: 104px; padding: 10px 12px; line-height: 1.55; resize: vertical; }
 select.input { appearance: none; padding-right: 34px; background: var(--input-bg) var(--select-chevron) no-repeat right 11px center / 14px 14px; cursor: pointer; }
 select.input option { background: var(--overlay); color: var(--text); }
+.set-select { flex: none; width: auto; min-width: 200px; max-width: 46%; }
 input[type="number"].input { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 .chip {
@@ -575,7 +576,7 @@ input.toggle:checked::before { transform: translateX(14px); }
 /* ───────────── Path */
 .sec { margin-bottom: 36px; }
 .sec > h2 { display: flex; align-items: baseline; gap: 10px; padding: 0 8px; margin-bottom: 6px; font-size: 13px; color: var(--text-2); }
-.sec > h2 .num { font-weight: 400; color: var(--text-3); }
+.sec > h2 .num, .sec > h2 .muted { font-weight: 400; color: var(--text-3); }
 .unit { border-top: 1px solid var(--line); scroll-margin-top: 20px; }
 .sec > .unit:last-child { border-bottom: 1px solid var(--line); }
 .unit-head {

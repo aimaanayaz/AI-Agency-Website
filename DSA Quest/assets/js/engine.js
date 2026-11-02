@@ -120,18 +120,24 @@
   const CORE = new Set(D.core || []);
   E.isCore = ref => CORE.has(E.idOf(ref));
   E.essentialsOnly = () => prof().scope !== 'all';
+  // Where the path starts ("Start from" in Settings). Sections before it are ones he already knows: they leave the path,
+  // and their problems stay as extra practice. Problems he has solved there still come back as revisits.
+  E.startIndex = () => { const s = E.idx.sections.find(x => x.id === prof().startAt); return s ? s.index : 0; };
+  E.isKnown = unit => !!unit && unit.section.index < E.startIndex();
+  const needed = (ref, unit, all) => all || (!E.isKnown(unit) && (!E.essentialsOnly() || CORE.has(E.idOf(ref))));
   E.isRequired = (entry, unit, all = false) => {
     if (entry.optional) return false;
     const ref = entry.ref;
     if (E.isVideo(ref)) {
+      if (!all && E.isKnown(unit)) return false;
       const w = E.idx && E.idx.walkOf[ref];
       return !w || w.some(r => E.isRequired({ ref: r }, unit, all)); // a solution lecture is needed only for a needed problem
     }
-    return all || !E.essentialsOnly() || CORE.has(E.idOf(ref));
+    return needed(ref, unit, all);
   };
-  E.challengeOf = unit => (prof().bosses && unit.boss.length ? unit.boss[0] : null);
+  E.challengeOf = unit => (prof().bosses && unit.boss.length && !E.isKnown(unit) ? unit.boss[0] : null);
   // Challenge-slot problems that are essentials anyway (Blind 75 classics) are practised like any other essential.
-  E.coreBosses = (unit, all = false) => unit.boss.filter((b, k) => !(k === 0 && prof().bosses) && (all || !E.essentialsOnly() || CORE.has(E.idOf(b))));
+  E.coreBosses = (unit, all = false) => { const ch = E.challengeOf(unit); return unit.boss.filter(b => b !== ch && needed(b, unit, all)); };
 
   // ─────────────────────────────── Status
   E.isDone = ref => { const it = S.peek(ref); return !!(it && (it.status === 'done' || it.status === 'skip')); };
@@ -165,8 +171,9 @@
   };
   E.currentUnit = () => E.idx.units.find(u => !E.unitProgress(u).complete) || E.idx.units[E.idx.units.length - 1];
   // The big picture: essentials done, and the course as sections with where you are.
-  E.coreCount = () => { const ids = (D.core || []).filter(id => P[id]); return { done: ids.filter(id => E.isDone('p:' + id)).length, total: ids.length }; };
-  E.extraLeft = () => Object.keys(P).filter(id => E.idx.loc['p:' + id] && !CORE.has(id) && !E.isDone('p:' + id)).length;
+  const knownId = id => { const l = E.idx.loc['p:' + id]; return !!l && E.isKnown(l.unit); };
+  E.coreCount = () => { const ids = (D.core || []).filter(id => P[id] && !knownId(id)); return { done: ids.filter(id => E.isDone('p:' + id)).length, total: ids.length }; };
+  E.extraLeft = () => Object.keys(P).filter(id => E.idx.loc['p:' + id] && (!CORE.has(id) || knownId(id)) && !E.isDone('p:' + id)).length;
   E.courseMap = () => {
     const cur = E.currentUnit();
     return E.idx.sections.map(s => Object.assign({ id: s.id, title: s.title, current: s === cur.section }, E.sectionProgress(s))).filter(s => s.total > 0);
@@ -388,8 +395,8 @@
   // ─────────────────────────────── Rewards he sets himself
   E.milestones = () => {
     const out = [];
-    E.idx.units.filter(u => !u.cleared).forEach(u => out.push({ type: 'unit', target: u.id, label: `Finish ${u.title}` }));
-    E.idx.sections.filter(s => s.index > 0).forEach(s => out.push({ type: 'section', target: s.id, label: `Finish the ${s.title} section` }));
+    E.idx.units.filter(u => !u.cleared && !E.isKnown(u)).forEach(u => out.push({ type: 'unit', target: u.id, label: `Finish ${u.title}` }));
+    E.idx.sections.filter(s => s.index > 0 && s.index >= E.startIndex()).forEach(s => out.push({ type: 'section', target: s.id, label: `Finish the ${s.title} section` }));
     [10, 25, 50, 100, 200].forEach(n => out.push({ type: 'locked', target: n, label: `${n} problems locked in` }));
     [25, 50, 75, 100].forEach(n => out.push({ type: 'a2z', target: n, label: `${n}% of Striver's A2Z` }));
     return out;

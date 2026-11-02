@@ -14,6 +14,8 @@
         <header class="page-head"><h1>Settings</h1></header>
 
         <section class="block"><h2>Path</h2>
+          <div class="set-row"><span><b>Start from</b><span class="muted small">The sections before it are ones you already know. They leave the path and stay in the Syllabus as extra practice. Problems you solved there still come back to revise.</span></span>
+            <select class="input set-select" data-start aria-label="Start from">${E.idx.sections.map(s => `<option value="${s.id}" ${s.index === E.startIndex() ? 'selected' : ''}>${s.index === 0 ? 'The beginning' : U.esc(s.title)}</option>`).join('')}</select></div>
           ${toggle('essentials', 'Essentials first', `The hand-picked essentials (${E.coreCount().total} problems) come first; the other ${E.extraLeft()} stay as extra practice for after. Turn it off to do every problem in teaching order.`, p.scope !== 'all')}
           ${toggle('bosses', 'Unit challenge', 'One unseen problem at the end of each unit, to check you own it. Hints stay closed for the first 25 minutes, like an interview.', p.bosses)}
           ${toggle('hideDifficulty', 'Hide difficulty until solved', "Like a real interview: you don't know if a problem is Easy or Hard until you've solved it.", p.hideDifficulty)}
@@ -47,6 +49,8 @@
         else S.state.profile[inp.dataset.toggle] = inp.checked;
         S.commit();
       }));
+      const start = root.querySelector('[data-start]');
+      if (start) start.addEventListener('change', () => { S.state.profile.startAt = start.value; S.commit(); });
       const f = root.querySelector('#import-file');
       if (f) f.addEventListener('change', () => { const file = f.files[0]; if (!file) return; file.text().then(t => { try { S.importJSON(t); location.reload(); } catch (e) { ui.toast(U.esc(e.message)); } }); });
     },
