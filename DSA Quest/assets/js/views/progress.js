@@ -5,7 +5,8 @@
   function summary() {
     const a2z = E.a2zProgress(), locked = E.lockedCount();
     let days = 0; for (let i = 0; i < 14; i++) if (E.isActive(U.addDays(U.today(), -i))) days++;
-    return `<p class="lede">You have done <b>${a2z.done} of ${a2z.total}</b> Striver A2Z problems. ${locked ? `<b>${locked}</b> ${locked === 1 ? 'is' : 'are'} locked in, meaning you solved ${locked === 1 ? 'it' : 'them'} cleanly again weeks later.` : 'None is locked in yet. A problem locks in when you solve it cleanly again weeks later.'} You studied on <b>${days} of the last 14 days</b>.</p>`;
+    const core = E.coreCount();
+    return `<p class="lede">Essentials: <b>${core.done} of ${core.total}</b> done (${a2z.done} of ${a2z.total} Striver A2Z problems in all). ${locked ? `<b>${locked}</b> ${locked === 1 ? 'is' : 'are'} locked in, meaning you solved ${locked === 1 ? 'it' : 'them'} cleanly again weeks later.` : 'None is locked in yet. A problem locks in when you solve it cleanly again weeks later.'} You studied on <b>${days} of the last 14 days</b>.</p>`;
   }
 
   // One row per problem: its first solve against its latest re-solve (like with like). Recalls are counted, never timed against a solve.

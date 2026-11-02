@@ -115,14 +115,23 @@
     E.idx = idx;
   };
 
-  // Whether an item belongs on the line (optional items stay reachable from the Syllabus).
-  E.isRequired = (entry, unit) => {
+  // Essentials first: the hand-picked core (data/core.js) is the path; everything else is Extra practice, which comes after.
+  // With "Essentials first" off, the whole syllabus is the path again. `all` asks the question for the extra-practice pass.
+  const CORE = new Set(D.core || []);
+  E.isCore = ref => CORE.has(E.idOf(ref));
+  E.essentialsOnly = () => prof().scope !== 'all';
+  E.isRequired = (entry, unit, all = false) => {
     if (entry.optional) return false;
-    const p = !E.isVideo(entry.ref) && P[E.idOf(entry.ref)];
-    if (p && (p.src === 'babbar' || p.src === 'bonus') && !prof().extras) return false;
-    return true;
+    const ref = entry.ref;
+    if (E.isVideo(ref)) {
+      const w = E.idx && E.idx.walkOf[ref];
+      return !w || w.some(r => E.isRequired({ ref: r }, unit, all)); // a solution lecture is needed only for a needed problem
+    }
+    return all || !E.essentialsOnly() || CORE.has(E.idOf(ref));
   };
   E.challengeOf = unit => (prof().bosses && unit.boss.length ? unit.boss[0] : null);
+  // Challenge-slot problems that are essentials anyway (Blind 75 classics) are practised like any other essential.
+  E.coreBosses = (unit, all = false) => unit.boss.filter((b, k) => !(k === 0 && prof().bosses) && (all || !E.essentialsOnly() || CORE.has(E.idOf(b))));
 
   // ─────────────────────────────── Status
   E.isDone = ref => { const it = S.peek(ref); return !!(it && (it.status === 'done' || it.status === 'skip')); };
@@ -136,6 +145,7 @@
     let done = 0, total = 0;
     unit.lessons.forEach(l => { const p = E.lessonProgress(l); done += p.done; total += p.total; });
     const ch = E.challengeOf(unit); if (ch) { total++; if (E.isDone(ch)) done++; }
+    E.coreBosses(unit).forEach(b => { total++; if (E.isDone(b)) done++; });
     return { done, total, pct: total ? done / total : 1, complete: done === total };
   };
   E.sectionProgress = sec => { let done = 0, total = 0; sec.units.forEach(u => { const p = E.unitProgress(u); done += p.done; total += p.total; }); return { done, total, pct: total ? done / total : 1, complete: done === total }; };
@@ -154,6 +164,13 @@
     return { byDiff, topics, blind: count(blind) };
   };
   E.currentUnit = () => E.idx.units.find(u => !E.unitProgress(u).complete) || E.idx.units[E.idx.units.length - 1];
+  // The big picture: essentials done, and the course as sections with where you are.
+  E.coreCount = () => { const ids = (D.core || []).filter(id => P[id]); return { done: ids.filter(id => E.isDone('p:' + id)).length, total: ids.length }; };
+  E.extraLeft = () => Object.keys(P).filter(id => E.idx.loc['p:' + id] && !CORE.has(id) && !E.isDone('p:' + id)).length;
+  E.courseMap = () => {
+    const cur = E.currentUnit();
+    return E.idx.sections.map(s => Object.assign({ id: s.id, title: s.title, current: s === cur.section }, E.sectionProgress(s))).filter(s => s.total > 0);
+  };
 
   // ─────────────────────────────── Outcomes and resurfacing
   E.OUTCOMES = {
@@ -265,11 +282,14 @@
 
   // A lecture that solves specific problems is "embedded": its problems carry it as their solution, so it never
   // needs a row of its own and counts as watched once those problems are done.
-  const solvedOnScreen = (v, unit) => (E.idx.walkOf[v] || []).filter(r => E.isRequired({ ref: r }, unit));
-  E.isEmbedded = (v, unit) => solvedOnScreen(v, unit).length > 0;
-  E.solutionOf = ref => { const v = E.idx.solutionFor[ref], loc = E.idx.loc[ref]; return v && loc && E.isEmbedded(v, loc.unit) ? v : null; };
+  const solvedOnScreen = (v, unit, all = false) => (E.idx.walkOf[v] || []).filter(r => E.isRequired({ ref: r }, unit, all));
+  E.isEmbedded = (v, unit, all = false) => solvedOnScreen(v, unit, all).length > 0;
+  E.solutionOf = (ref, all = false) => { const v = E.idx.solutionFor[ref], loc = E.idx.loc[ref]; return v && loc && E.isEmbedded(v, loc.unit, all) ? v : null; };
+  // Watched once the problems it solves are done: the essential ones, or (for a lecture of extra problems) all of them.
   const settleLecture = (v, unit) => {
-    if (!v || E.isDone(v) || !E.isEmbedded(v, unit) || !solvedOnScreen(v, unit).every(E.isDone)) return;
+    if (!v || E.isDone(v) || !E.idx.walkOf[v]) return;
+    const core = solvedOnScreen(v, unit), list = core.length ? core : solvedOnScreen(v, unit, true);
+    if (!list.length || !list.every(E.isDone)) return;
     const it = S.item(v); it.status = 'done'; it.doneAt = Date.now(); it.viaProblems = true;
   };
   // Items of a lesson in learning order: problems a lecture solves come before it, practice problems after it.
@@ -286,19 +306,28 @@
     return out;
   };
 
-  // Everything new that is left, in learning order. "Skip for now" moves an item behind the next one.
-  E.newQueue = () => {
+  // What is left in learning order: the essentials through the whole course; once those are done, the extra practice.
+  // "Skip for now" moves an item behind the next one.
+  const buildQueue = all => {
     const out = [];
     E.idx.units.forEach(u => {
       u.lessons.forEach(l => E.orderedItems(l).forEach(i => {
-        if (!E.isRequired(i, u) || E.isDone(i.ref)) return;
-        if (E.isVideo(i.ref) && E.isEmbedded(i.ref, u)) return;
+        if (!E.isRequired(i, u, all) || E.isDone(i.ref)) return;
+        if (E.isVideo(i.ref) && E.isEmbedded(i.ref, u, all)) return;
         const step = { id: 'new:' + i.ref, ref: i.ref, kind: 'new', mode: E.isVideo(i.ref) ? 'watch' : P[E.idOf(i.ref)].d === 'T' ? 'read' : 'solve' };
-        const sol = !E.isVideo(i.ref) && E.solutionOf(i.ref); if (sol) step.solution = sol;
+        const sol = !E.isVideo(i.ref) && E.solutionOf(i.ref, all); if (sol) step.solution = sol;
+        if (all) step.extra = true;
         out.push(step);
       }));
+      E.coreBosses(u, all).forEach(b => { if (!E.isDone(b)) out.push({ id: 'new:' + b, ref: b, kind: 'new', mode: 'solve', extra: all || undefined }); });
       const ch = E.challengeOf(u); if (ch && !E.isDone(ch)) out.push({ id: 'new:' + ch, ref: ch, kind: 'new', mode: 'solve', challenge: true });
     });
+    return out;
+  };
+  E.phase = () => (buildQueue(false).length ? 'core' : 'extra');
+  E.newQueue = () => {
+    let out = buildQueue(false);
+    if (!out.length) out = buildQueue(true);
     const skipped = st().skipped || [];
     if (!skipped.length) return out;
     const keep = out.filter(s => !skipped.includes(s.ref)), later = out.filter(s => skipped.includes(s.ref));

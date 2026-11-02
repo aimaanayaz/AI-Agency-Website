@@ -14,7 +14,7 @@
     return `<li><button class="prow ${done ? 'is-done' : ''} ${req ? '' : 'is-optional'}" data-act="open" data-ref="${ref}">
       ${ui.dot(it.outcome, done)}
       <span class="prow-title">${U.esc(E.title(ref))}${extra || ''}</span>
-      <span class="prow-meta">${U.esc(meta)}${req ? '' : ', optional'}</span>
+      <span class="prow-meta">${U.esc(meta)}${req ? '' : entry.optional ? ', optional' : ', extra practice'}</span>
       <span class="prow-status">${o && !E.isVideo(ref) ? `<span class="tone-text-${o.tone}">${U.esc(o.label)}</span>` : ''}${it.locked ? `<span class="locked">${U.icon('target', 14)}Locked in</span>` : ''}</span>
     </button></li>`;
   }
@@ -67,7 +67,7 @@
       const a2z = E.a2zProgress(), cur = E.currentUnit();
       return `<div class="page">
         <header class="page-head"><h1>Syllabus</h1>
-          <p class="sub">Everything on the path, in order. <span class="num">${a2z.done}</span> of <span class="num">${a2z.total}</span> A2Z problems done, <span class="num">${E.remaining()}</span> steps left.</p></header>
+          <p class="sub">Everything on the path, in order. Essentials: <span class="num">${E.coreCount().done}</span> of <span class="num">${E.coreCount().total}</span> done. Dimmed rows are extra practice, which comes after the essentials (<span class="num">${E.extraLeft()}</span> left).</p></header>
         <div class="toolbar"><label class="search">${U.icon('magnifying-glass', 16)}<input class="input" data-search placeholder="Find a problem or lecture" value="${U.esc(query)}" aria-label="Search the path"></label></div>
         <div id="path-body">${query ? results() : E.idx.sections.map(sec => {
           const sp = E.sectionProgress(sec);

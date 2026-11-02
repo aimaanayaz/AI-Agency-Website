@@ -70,19 +70,19 @@
     return E.isSolved(ref) ? 'again' : 'solve';
   };
 
-  function instruction(ref, mode, it) {
-    const last = it && (it.attempts || []).slice(-1)[0];
-    const lastTxt = last ? `${(E.outcomeMeta(last.outcome) || {}).label || 'Done'}${last.mins ? ', ' + last.mins + ' min' : ''}` : '';
-    if (mode === 'solve') {
-      const p = E.problem(E.idOf(ref)), sol = E.solutionOf(ref);
-      if (p && p.src === 'boss') return "A problem you haven't seen, to check you really own this unit. No hints for the first 25 minutes.";
-      if (sol) return `${ui.lectureName(sol)} solves this. Try it on your own first; when you're done or stuck, watch the solution below, then pick how it went.`;
-      return 'Try it on your own first. Open a hint only when you are truly stuck.';
-    }
-    if (mode === 'resolve') return `${E.lastSeenText(it)}. Re-solve it from scratch.${it && it.aim === 'optimal' ? ' Go for the optimal approach this time.' : ''}${lastTxt ? ' Last time: ' + lastTxt + '.' : ''}`;
-    if (mode === 'recall') return `${E.lastSeenText(it)}. Without opening it, say how you'd solve it: the pattern, the key idea and the complexity. Then check your note.`;
-    if (mode === 'read') return 'A short concept. Read it once, then write the one idea you want to remember.';
-    return '';
+  // The step as numbered actions, in the same order as the controls under them, so it is always clear what to do.
+  const todoList = (items, note) => `${note ? `<p class="instruction">${U.esc(note)}</p>` : ''}<ol class="todo">${items.map(t => `<li>${U.esc(t)}</li>`).join('')}</ol>`;
+  function todo(ref, mode, it, step) {
+    const p = E.problem(E.idOf(ref)) || {}, sol = (step && step.solution) || (mode === 'solve' ? E.solutionOf(ref) : null);
+    const where = E.practiceLink(p).label;
+    const last = (it.attempts || []).slice(-1)[0];
+    const lastTxt = last ? `Last time: ${(E.outcomeMeta(last.outcome) || {}).label || 'Done'}${last.mins ? ', ' + last.mins + ' min' : ''}.` : '';
+    if (mode === 'recall') return todoList(['Without opening it, say how you would solve it: the pattern, the key idea and the time complexity.', 'Tap "Show my note" and compare.', 'Pick how much came back.'], `${E.lastSeenText(it)}.`);
+    if (mode === 'resolve') return todoList([`Open it on ${where} and solve it again from scratch, without looking at old code.${it.aim === 'optimal' ? ' Aim for the optimal approach this time.' : ''}`, 'Write the key idea if it changed.', 'Pick how it went.'], `${E.lastSeenText(it)}. ${lastTxt}`.trim());
+    if (mode === 'read') return todoList(['Read about it.', 'Write the one idea to remember in Key idea.', 'Press Done.']);
+    if (p.src === 'boss' || (step && step.challenge)) return todoList([`Open it on ${where} and solve it on your own. Hints open after 25 minutes on the timer.`, 'Write the key idea in one line.', 'Pick how it went.'], "An unseen problem, to check you really own this unit.");
+    if (sol) return todoList([`Open it on ${where} and try it on your own. The timer starts by itself.`, `Done or stuck? Watch the solution: ${ui.lectureName(sol)}.`, 'Write the key idea in one line.', 'Pick how it went.']);
+    return todoList([`Open it on ${where} and solve it on your own. The timer starts by itself.`, 'Stuck for a while? Open "Stuck? Hints and solutions".', 'Write the key idea in one line.', 'Pick how it went.']);
   }
 
   // "Lecture 60" for Babbar, the video title for Striver.
@@ -155,7 +155,8 @@
         <header class="panel-head"><h2>${U.esc(v.t)}</h2>
           <div class="meta">${v.src === 'babbar' ? '<span class="chip">Babbar, Java</span>' : '<span class="chip">Striver</span>'}${v.dur ? `<span class="muted"><span class="num">${Math.round(v.dur / 60)}</span> min</span>` : ''}</div></header>
         <a class="video" href="${U.ytUrl(id)}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}"><img src="https://i.ytimg.com/vi/${id}/hqdefault.jpg" alt="" loading="lazy"><span class="video-play">${U.icon('play', 22)}</span></a>
-        <p class="instruction">${E.idx.walkOf[ref] && E.isEmbedded(ref, (E.idx.loc[ref] || {}).unit) ? 'This is the solution to the problems before it. Watch it after you have tried them.' : 'This one introduces the idea, so it comes before the problems. Watch at your own speed and code along; the problems after it are your practice.'} Mark it watched whenever you finish, in one go or over a few sittings.</p>
+        ${E.idx.walkOf[ref] ? todoList(['Try the problems it solves first (they come just before it on your path).', 'Then watch how it is solved and compare with your attempt.', 'Press "Mark as watched".'], 'This lecture is the solution to a few problems.')
+          : todoList(['Watch it at your own speed and code along.', 'Write the one idea to remember in Key idea.', 'Press "Mark as watched". Finishing it over a few sittings is fine.'], 'This lecture introduces the idea, so it comes before the problems.')}
         ${chapters.length ? `<div class="chapters">${chapters.map(([t, l]) => `<a href="${U.ytUrl(id, t)}" target="_blank" rel="noopener"><span class="num">${U.fmtClock(t)}</span>${U.esc(l)}</a>`).join('')}</div>` : ''}
         ${notesBlock(ref, 'watch', it)}
         <div class="panel-actions">
@@ -185,11 +186,11 @@
         <div class="meta">${E.showDiff(ref) ? ui.diff(p.d) : ''}${E.isBlind75(p) ? '<span class="chip">Blind 75</span>' : ''}${src ? `<span class="chip">${src}</span>` : ''}${p.prem ? '<span class="chip">LeetCode Premium</span>' : ''}${loc ? `<span class="muted">${U.esc(loc.unit.title)}</span>` : ''}
           <button class="pin ${it.pinned ? 'is-on' : ''}" data-act="pin" data-ref="${ref}" title="${it.pinned ? 'Unpin' : 'Pin to the Notebook'}" aria-pressed="${!!it.pinned}">${U.icon('push-pin', 16)}</button></div>
       </header>
-      ${mode !== 'again' ? `<p class="instruction">${U.esc(instruction(ref, mode, it))}</p>` : ''}
+      ${mode !== 'again' ? todo(ref, mode, it, step) : ''}
       ${mode !== 'recall' ? `<div class="panel-actions">
         ${p.d === 'T' ? `<a class="btn btn-primary" href="${p.gfg || U.google(p.t + ' java explained')}" target="_blank" rel="noopener">${U.icon('book-open', 16)}<span>Read about it</span></a>` :`<a class="btn btn-primary" href="${link.url}" target="_blank" rel="noopener" data-act="start-timer" data-ref="${ref}">${U.icon('arrow-square-out', 16)}<span>Open on ${link.label}</span></a>${timer}`}
       </div>` : ''}
-      ${mode === 'solve' && E.solutionOf(ref) ? solutionCard(E.solutionOf(ref)) : ''}
+      ${mode === 'solve' && ((step && step.solution) || E.solutionOf(ref)) ? solutionCard((step && step.solution) || E.solutionOf(ref)) : ''}
       ${p.d !== 'T' && !(mode === 'recall' && !ui._revealed[ref]) ? helpBlock(ref, p, mode) : ''}
       ${notesBlock(ref, mode, it)}
       ${outcome}

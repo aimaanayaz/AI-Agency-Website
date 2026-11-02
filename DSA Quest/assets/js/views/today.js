@@ -5,17 +5,36 @@
   const DIFF = { E: 'Easy', M: 'Medium', H: 'Hard' };
   let lastBar = null; // { unit, pct } so the unit bar can grow from where it was
 
+  // What kind of step this is, said plainly, so the line reads at a glance.
+  const kindOf = s => (s.kind === 'again' ? 'Revisit' : s.mode === 'watch' ? 'Watch' : s.mode === 'read' ? 'Read' : s.challenge ? 'Challenge' : s.solution ? 'Try first' : 'Practice');
   function stepMeta(s) {
     const it = S.peek(s.ref) || {};
+    const tag = `<span class="kind">${kindOf(s)}</span>`;
+    const extra = s.extra ? ', extra practice' : '';
     if (s.mode === 'watch') {
       const v = E.video(E.idOf(s.ref)) || {};
-      return `${v.src === 'babbar' ? 'Babbar lecture' : 'Striver lecture'}${v.dur ? `, <span class="num">${Math.round(v.dur / 60)}</span> min` : ''}`;
+      return `${tag}${v.src === 'babbar' ? 'Babbar lecture' : 'Striver lecture'}${v.dur ? `, <span class="num">${Math.round(v.dur / 60)}</span> min` : ''}${extra}`;
     }
     const p = E.problem(E.idOf(s.ref)); if (!p) return '';
-    if (s.kind === 'again') return `Revisit, ${U.esc(E.lastSeenText(it).toLowerCase())}, ${s.mode === 'recall' ? 'quick recall' : 're-solve'}`;
-    if (s.mode === 'read') return 'Concept';
+    if (s.kind === 'again') return `${tag}${U.esc(E.lastSeenText(it))}, ${s.mode === 'recall' ? 'say how you would solve it' : 'solve it again'}`;
+    if (s.mode === 'read') return `${tag}Short concept${extra}`;
     const diff = E.showDiff(s.ref) ? DIFF[p.d] || '' : 'Problem';
-    return `${diff}${E.isBlind75(p) ? ', Blind 75' : ''}${s.challenge || p.src === 'boss' ? ', unit challenge' : ''}${s.solution ? `, try it, then ${(E.video(E.idOf(s.solution)) || {}).lec ? "Babbar's" : "Striver's"} solution` : ''}`;
+    const sol = s.solution ? `, then ${(E.video(E.idOf(s.solution)) || {}).lec ? "Babbar's" : "Striver's"} solution` : '';
+    return `${tag}${diff}${E.isBlind75(p) ? ', Blind 75' : ''}${s.challenge ? ', unseen, for this unit' : ''}${sol}${extra}`;
+  }
+
+  // The whole course at a glance: essentials done, one segment per section, and where you are.
+  function course() {
+    const map = E.courseMap(), core = E.coreCount(), phase = E.phase();
+    const i = map.findIndex(s => s.current), cur = map[i], next = map[i + 1];
+    const top = phase === 'core'
+      ? `<span><b>Essentials</b> <span class="num">${core.done}/${core.total}</span> problems done</span>`
+      : `<span><b>Essentials complete.</b> Extra practice: <span class="num">${E.extraLeft()}</span> problems left</span>`;
+    return `<section class="course" aria-label="The whole course">
+      <div class="course-top">${top}<a href="#/path">See the syllabus</a></div>
+      <div class="course-bar" role="img" aria-label="${map.filter(s => s.complete).length} of ${map.length} sections done">${map.map(s => `<span class="cseg${s.complete ? ' is-done' : ''}${s.current ? ' is-current' : ''}" style="flex:${Math.max(1, s.total)}" title="${U.esc(s.title)}: ${s.done}/${s.total}"><i style="width:${Math.round(s.pct * 100)}%"></i></span>`).join('')}</div>
+      ${cur ? `<p class="course-now">Section <span class="num">${i + 1}</span> of <span class="num">${map.length}</span>: <b>${U.esc(cur.title)}</b>${next ? `, then ${U.esc(next.title)}` : ''}</p>` : ''}
+    </section>`;
   }
 
   const thumb = (s, big) => { const vid = s.mode === 'watch' ? E.idOf(s.ref) : s.solution ? E.idOf(s.solution) : null; return vid ? `<span class="node-thumb${big ? ' is-big' : ''}${s.solution ? ' is-solution' : ''}"><img src="https://i.ytimg.com/vi/${vid}/mqdefault.jpg" alt="" loading="lazy"></span>` : ''; };
@@ -71,7 +90,7 @@
     if (ui._justDone && past.length) past[past.length - 1].id = ui._justDone;
     let html = past.map(s => row('past', s, selId)).join('');
     // Dividers compare against the unit in the header; revisits from older units never start a new section.
-    let unitNow = E.currentUnit();
+    const fn = steps.find(s => s.kind === "new"); let unitNow = (fn && E.idx.loc[fn.ref] && E.idx.loc[fn.ref].unit) || E.currentUnit();
     steps.forEach((s, i) => {
       const u = s.kind === 'new' && E.idx.loc[s.ref] ? E.idx.loc[s.ref].unit : null;
       if (u && u !== unitNow) { html += `<li class="line-unit"><span>${U.esc(u.title)}</span></li>`; unitNow = u; }
@@ -91,7 +110,7 @@
   DQ.views.today = {
     render() {
       const steps = E.line(12), p = S.state.profile;
-      const unit = E.currentUnit(), up = E.unitProgress(unit);
+      const firstNew = steps.find(s => s.kind === "new"), unit = (firstNew && E.idx.loc[firstNew.ref] && E.idx.loc[firstNew.ref].unit) || E.currentUnit(), up = E.unitProgress(unit);
       const picked = ui._sel && (steps.find(s => s.id === ui._sel) || E.recent(2).map(x => ({ id: 'log:' + x.at, ref: x.ref })).find(s => s.id === ui._sel));
       const sel = picked || steps[0] || null;
       const isStep = sel && steps.includes(sel);
@@ -105,9 +124,10 @@
       const left = Math.max(0, up.total - up.done);
       return `<div class="today">
         <section class="session" aria-label="The path">
+          ${course()}
           <header class="unit-hero">
             <h1>${U.esc(unit.title)}</h1>
-            <p class="sub"><span class="num">${up.done}/${up.total}</span> done in this unit, unit <span class="num">${unit.index + 1}</span> of <span class="num">${E.idx.units.length}</span></p>
+            <p class="sub">${left ? `<span class="num">${left}</span> of <span class="num">${up.total}</span> left in this topic` : 'Topic done'}${E.phase() === 'extra' ? ', extra practice' : ''}</p>
             <div class="unit-bar" role="img" aria-label="${pct}% of this unit done"><span data-to="${pct}" style="width:${from}%"></span></div>
             ${unit.desc ? `<p class="unit-lede">${U.esc(unit.desc)}</p>` : ''}
             <p class="phone-stats"><span>${U.icon('fire', 15)}<span>${E.streak() ? `<span class="num">${E.streak()}</span> ${E.streak() === 1 ? 'day' : 'days'} in a row` : 'Start a streak today'}</span></span><span>${U.icon('check-circle', 15)}<span><span class="num">${E.doneToday()}</span> done today</span></span>${DQ.sync.enabled ? `<span class="sync-line" data-sync-line>${ui.syncLine()}</span>` : ''}</p>

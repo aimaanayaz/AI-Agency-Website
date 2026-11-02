@@ -13,7 +13,7 @@
     onboarded: false,
     profile: {
       name: 'Aimaan',
-      extras: true,       // Babbar's extra lecture problems on the path
+      scope: 'core',      // essentials first ('core'), or every problem in teaching order ('all')
       bosses: true,       // one unseen "challenge" problem at the end of each unit
       hideDifficulty: false, // hide Easy/Medium/Hard until a problem is solved
       theme: 'system',
