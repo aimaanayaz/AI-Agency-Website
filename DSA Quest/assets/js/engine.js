@@ -250,6 +250,7 @@
       it.outcome = outcome;
       if (m) it.bestMins = it.bestMins ? Math.min(it.bestMins, m) : m;
       it.attempts = (it.attempts || []).concat([{ d: U.today(), kind: first ? 'first' : step.mode, outcome, mins: m }]);
+      it.before = { interval: it.interval || 0, locked: !!it.locked }; // lets the Checklist correct the outcome afterwards
       schedule(ref, it, outcome, step.mode);
       if (it.locked && !lockedBefore) events.push({ type: 'locked', ref });
     }
@@ -269,6 +270,18 @@
     return events;
   };
 
+  // The Checklist ticks with one tap (a clean solve, or remembered). "How did it go?" can then correct the outcome
+  // of that same attempt: it is re-scheduled from where it was before, and nothing counts twice.
+  E.amend = (ref, outcome) => {
+    const it = S.peek(ref), last = it && (it.attempts || []).slice(-1)[0];
+    if (!it || it.status !== 'done' || !last) return;
+    const mode = last.kind === 'first' ? 'solve' : last.kind;
+    last.outcome = outcome; it.outcome = outcome; if (mode === 'solve') it.firstOutcome = outcome;
+    const lg = (st().log || []).filter(x => x.ref === ref).pop(); if (lg) lg.outcome = outcome;
+    if (it.before) { it.interval = it.before.interval; it.locked = it.before.locked; }
+    schedule(ref, it, outcome, mode);
+    E.version++;
+  };
   E.undo = ref => {
     const it = S.peek(ref); if (!it) return;
     ['status', 'doneAt', 'outcome', 'firstOutcome', 'next', 'interval', 'mode', 'locked', 'aim', 'parts'].forEach(k => delete it[k]);

@@ -54,6 +54,9 @@
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   };
 
+  // The DSA Quest mark (same as assets/img/icon.svg): the path so far solid, the road ahead faded, the amber node is now.
+  let logoN = 0;
+  U.logo = () => { const g = 'dqlogo' + (++logoN); return `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="${g}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7078ff"/><stop offset="1" stop-color="#3f3fc9"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="url(#${g})"/><path d="M17 45L32 21" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M32 21L47 40" stroke="#fff" stroke-opacity=".45" stroke-width="6" stroke-linecap="round"/><circle cx="17" cy="45" r="7" fill="#fff"/><circle cx="32" cy="21" r="7" fill="#fff"/><circle cx="47" cy="40" r="8" fill="#ffd166"/></svg>`; };
   // Phosphor icons (assets/js/icons.js).
   U.icon = (name, size = 18) => `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">${(window.DQ_ICONS || {})[name] || ''}</svg>`;
 

@@ -5,10 +5,13 @@
   DQ.views = DQ.views || {};
   ui.on = (name, fn) => { ui.actions[name] = fn; };
 
-  const NAV = [['today', 'Path', 'path'], ['path', 'Syllabus', 'list-checks'], ['notebook', 'Notebook', 'notebook'], ['progress', 'Progress', 'chart-line-up']];
+  const NAV = [['today', 'Path', 'path'], ['checklist', 'Checklist', 'list-checks'], ['path', 'Syllabus', 'book-open'], ['notebook', 'Notebook', 'notebook'], ['progress', 'Progress', 'chart-line-up']];
 
   // ───────────────────────── Router
-  ui.route = () => location.hash.replace(/^#\/?/, '').split('?')[0] || 'today';
+  // Opening the app (no screen in the address) lands on the screen he used last: the Path or the Checklist. Per device.
+  const HOME = 'dsaquest.home';
+  ui.home = () => { try { return localStorage.getItem(HOME) === 'checklist' ? 'checklist' : 'today'; } catch (e) { return 'today'; } };
+  ui.route = () => location.hash.replace(/^#\/?/, '').split('?')[0] || ui.home();
   ui.params = () => new URLSearchParams(location.hash.split('?')[1] || '');
   ui.render = () => {
     const ob = !S.state.onboarded;
@@ -22,13 +25,14 @@
     main.scrollTop = y; window.scrollTo(0, y);
     if (view.mount) view.mount(main);
     ui._last = r;
+    if (!ob && (r === 'today' || r === 'checklist')) { try { localStorage.setItem(HOME, r); } catch (e) { /* private window */ } }
     ui.renderSidebar();
   };
 
   ui.renderSidebar = () => {
     const r = ui.route(), streak = E.streak();
     document.getElementById('sidebar').innerHTML = `
-      <a class="brand" href="#/today"><span class="brand-mark">DQ</span><span>DSA Quest</span></a>
+      <a class="brand" href="#/"><span class="brand-mark">${U.logo()}</span><span>DSA Quest</span></a>
       <nav class="nav" aria-label="Main">${NAV.map(([id, label, ic]) => `<a class="nav-item" href="#/${id}" ${r === id ? 'aria-current="page"' : ''}>${U.icon(ic)}<span>${label}</span></a>`).join('')}</nav>
       <div class="side-foot">
         <div class="side-stat">${U.icon('fire', 16)}<span>${streak ? U.plural(streak, 'day') + ' in a row' : 'Start a streak today'}</span></div>

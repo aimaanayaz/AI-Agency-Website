@@ -5,7 +5,7 @@
   try {
     // Hosted copy on a device that has never opened it: fetch the online progress first.
     if (DQ.sync.enabled && !S.hasLocal()) {
-      main.innerHTML = '<div class="boot"><span class="brand-mark lg">DQ</span><p class="muted">Loading your progress</p></div>';
+      main.innerHTML = `<div class="boot"><span class="brand-mark lg">${U.logo()}</span><p class="muted">Loading your progress</p></div>`;
       await DQ.sync.preload();
     }
     S.load();

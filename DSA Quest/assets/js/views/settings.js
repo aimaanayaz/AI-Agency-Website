@@ -69,7 +69,7 @@
     render() {
       const p = S.state.profile, n = Object.values(S.state.items).filter(it => it.status === 'done').length;
       return `<div class="onboard"><div class="onboard-card">
-        <span class="brand-mark lg">DQ</span>
+        <span class="brand-mark lg">${U.logo()}</span>
         <h1>${S.migrated ? 'DSA Quest, simplified' : `Welcome, ${U.esc(p.name)}`}</h1>
         <p class="muted">${S.migrated ? 'Same progress, one clear path.' : 'Babbar for lectures, Striver A2Z for practice, in one path: a lecture, then its problems, then the next.'} ${n} problems from your old tracker are already done. Go at your own pace; earlier problems come back on their own, in between new ones.</p>
         <button class="btn btn-primary wide" data-act="ob-start">Start the path</button>
